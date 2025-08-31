@@ -1,3 +1,4 @@
+/* Reset and base styles */
 * {
     margin: 0;
     padding: 0;
@@ -108,6 +109,51 @@ body {
     background: rgba(255, 255, 255, 0.1);
     border-left-color: #4CAF50;
     transform: translateX(5px);
+}
+
+/* Submenu Styles */
+.sidebar-item {
+    position: relative;
+}
+
+.reports-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.arrow-icon {
+    transition: transform 0.3s ease;
+    font-size: 12px;
+}
+
+.reports-toggle.active .arrow-icon {
+    transform: rotate(180deg);
+}
+
+.submenu {
+    list-style: none;
+    background-color: rgba(0, 0, 0, 0.2);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    margin-left: 20px;
+    border-radius: 4px;
+}
+
+.submenu.active {
+    max-height: 200px;
+}
+
+.submenu li a {
+    padding: 10px 20px;
+    font-size: 0.95em;
+    color: #bdc3c7;
+}
+
+.submenu li a:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 /* Content Area */
@@ -348,7 +394,6 @@ canvas {
     }
     
     .navbar {
-        flex-direction: column;
         align-items: center;
         text-align: center;
         padding: 15px;

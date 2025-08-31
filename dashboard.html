@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <title>Store Dashboard</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-     <div class="navbar">
+    <div class="navbar">
         <div class="left"> <img src="img/store logo with one element on a white background.png" alt=""></div>
         
         <div class="right">
@@ -19,12 +18,35 @@
         </div>
     </div>
     <div class="sidebar">
-      <ul>
-        <li><a href="#home">Dashboard</a></li>
-        <li><a href="order.html">order</a></li>
-        <li><a href="#about">About</a></li>
-        <li><a href="#contact">Contact</a></li>
-      </ul>
+        <ul>
+            <li><a href="#home">Dashboard</a></li>
+            <li><a href="order.html">order</a></li>
+            <li><a href="#">Customers</a></li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports1">Reports <i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports1">
+                    <li><a href="#">Inventory</a></li>
+                    <li><a href="#">Manage</a></li>
+                    <li><a href="#">Marketing</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports2">Analytics <i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports2">
+                    <li><a href="#">Sales Analytics</a></li>
+                    <li><a href="#">Customer Analytics</a></li>
+                    <li><a href="#">Performance Metrics</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports3">Settings <i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports3">
+                    <li><a href="#">User Settings</a></li>
+                    <li><a href="#">System Settings</a></li>
+                    <li><a href="#">Preferences</a></li>
+                </ul>
+            </li>
+        </ul>
     </div>
     <div class="content">
         <!-- Date Selector -->
@@ -43,6 +65,7 @@
         <h3>Orders Overview</h3>
         <a href="#" class="refresh-btn">Refresh</a>
       </div>
+      <h2 id="ordersCount">Total Orders: 0</h2>
       <canvas id="ordersChart"></canvas>
     </div>
 
@@ -50,7 +73,7 @@
     <div class="card">
       <div class="card-header">
         <h3>Net Sales</h3>
-        <a href="#" class="refresh-btn">View Report</a>
+        <a href="#" class="refresh-btn">Refresh</a>
       </div>
       <h2 id="salesAmount">EGP 0</h2>
       <canvas id="salesChart"></canvas>
@@ -60,7 +83,7 @@
     <div class="card">
       <div class="card-header">
         <h3>Net Payments</h3>
-        <a href="#" class="refresh-btn">View Report</a>
+        <a href="#" class="refresh-btn">Refresh</a>
       </div>
       <h2 id="paymentsAmount">EGP 0</h2>
       <canvas id="paymentsChart"></canvas>
@@ -68,6 +91,7 @@
     
   </div>
     </div>
-     <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

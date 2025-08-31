@@ -29,6 +29,7 @@ async function fetchDashboardData(date = null) {
 // Function to update dashboard with real data
 function updateDashboard(data) {
     // Update summary numbers
+    document.getElementById('ordersCount').textContent = 'Total Orders: ' + formatNumber(data.orders.total);
     document.getElementById('salesAmount').textContent = 'EGP ' + formatNumber(data.sales.total);
     document.getElementById('paymentsAmount').textContent = 'EGP ' + formatNumber(data.payments.total);
     
@@ -167,6 +168,7 @@ function handleDatabaseError(error) {
     const errorMessage = 'Unable to connect to database. Please check your connection and try again.';
     
     // Update dashboard with error state
+    document.getElementById('ordersCount').textContent = 'Total Orders: Error';
     document.getElementById('salesAmount').textContent = 'Error';
     document.getElementById('paymentsAmount').textContent = 'Error';
     
@@ -202,6 +204,34 @@ function loadTodayData() {
     fetchDashboardData(today);
 }
 
+// Function to toggle submenu
+function toggleSubmenu(submenuId) {
+    const submenu = document.getElementById(submenuId);
+    const toggleButton = document.querySelector(`[data-submenu="${submenuId}"]`);
+    
+    if (submenu && toggleButton) {
+        // Close all other submenus first
+        const allSubmenus = document.querySelectorAll('.submenu');
+        const allToggleButtons = document.querySelectorAll('.reports-toggle');
+        
+        allSubmenus.forEach(menu => {
+            if (menu.id !== submenuId) {
+                menu.classList.remove('active');
+            }
+        });
+        
+        allToggleButtons.forEach(btn => {
+            if (btn.getAttribute('data-submenu') !== submenuId) {
+                btn.classList.remove('active');
+            }
+        });
+        
+        // Toggle the clicked submenu
+        submenu.classList.toggle('active');
+        toggleButton.classList.toggle('active');
+    }
+}
+
 // Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Dashboard initializing...');
@@ -230,6 +260,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add date selection functionality
     document.getElementById('loadDateBtn').addEventListener('click', loadDateData);
     document.getElementById('todayBtn').addEventListener('click', loadTodayData);
+    
+    // Add submenu toggle functionality for all submenus
+    const submenuToggles = document.querySelectorAll('.reports-toggle');
+    submenuToggles.forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            const submenuId = this.getAttribute('data-submenu');
+            toggleSubmenu(submenuId);
+        });
+    });
     
     console.log('Dashboard initialized successfully');
 });
