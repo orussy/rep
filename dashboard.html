@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Store Dashboard</title>
+</head>
+<body>
+     <div class="navbar">
+        <div class="left"> <img src="img/store logo with one element on a white background.png" alt=""></div>
+        
+        <div class="right">
+            
+            <img src="img/bell-solid.svg" alt="Security">
+           
+            <img src="img/user-solid.svg" alt="Logout">
+        </div>
+    </div>
+    <div class="sidebar">
+      <ul>
+        <li><a href="#home">Dashboard</a></li>
+        <li><a href="order.html">order</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </div>
+    <div class="content">
+        <!-- Date Selector -->
+        <div class="date-selector">
+            <label for="datePicker">Select Date:</label>
+            <input type="date" id="datePicker" name="datePicker">
+            <button id="loadDateBtn" class="load-date-btn">Load Data</button>
+            <button id="todayBtn" class="today-btn">Today</button>
+        </div>
+        
+        <div class="dashboard">
+    
+    <!-- Orders Overview -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Orders Overview</h3>
+        <a href="#" class="refresh-btn">Refresh</a>
+      </div>
+      <canvas id="ordersChart"></canvas>
+    </div>
+
+    <!-- Net Sales -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Net Sales</h3>
+        <a href="#" class="refresh-btn">View Report</a>
+      </div>
+      <h2 id="salesAmount">EGP 0</h2>
+      <canvas id="salesChart"></canvas>
+    </div>
+
+    <!-- Net Payments -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Net Payments</h3>
+        <a href="#" class="refresh-btn">View Report</a>
+      </div>
+      <h2 id="paymentsAmount">EGP 0</h2>
+      <canvas id="paymentsChart"></canvas>
+    </div>
+    
+  </div>
+    </div>
+     <script src="script.js"></script>
+</body>
+</html>
