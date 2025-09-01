@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Details - Store Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+  
+</head>
+<body>
+    <div class="navbar">
+        <div class="left"> <img src="img/store logo with one element on a white background.png" alt=""></div>
+        
+        <div class="right">
+            <img src="img/bell-solid.svg" alt="Security">
+            <img src="img/user-solid.svg" alt="Logout">
+        </div>
+    </div>
+    <div class="sidebar">
+        <ul>
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="order.html" class="active">Orders</a></li>
+            <li><a href="customers.html">Customers</a></li>
+            <li><a href="#">Marketing</a></li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports1">Reports <i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports1">
+                     <li><a href="#">Sales Report</a></li>
+                     <li><a href="#">Inventory Report</a></li>
+                     <li><a href="#">Business Report</a></li>
+                     <li><a href="#">Analytics Report</a></li>
+                 </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports2">Inventory<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports2">
+                    <li><a href="#">Items</a></li>
+                    <li><a href="#">Categories</a></li>
+                    <li><a href="#">Sub Categories</a></li>
+                    <li><a href="#">Suppliers</a></li>
+                    <li><a href="#">Purchase Orders</a></li>
+                    <li><a href="#">Transfer Orders</a></li>
+                    <li><a href="#">Invetory Count</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports3">Manage<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports3">
+                    <li><a href="#">Users</a></li>
+                    <li><a href="#">Roles</a></li>
+                    <li><a href="#">More</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+              <a href="#" class="reports-toggle" data-submenu="reports4">Marketing<i class="arrow-icon">▼</i></a>
+              <ul class="submenu" id="reports4">
+                <li><a href="#">Loyalty</a></li>
+                <li><a href="#">Discounts</a></li>
+                <li><a href="#">Promocodes</a></li>
+              </ul>
+          </li>
+        </ul>
+    </div>
+    <div class="content">
+        <div class="order-details-container">
+            <div class="order-header">
+                <h1 class="order-title" id="orderTitle">Order Details</h1>
+                <a href="order.html" class="back-btn">← Back to Orders</a>
+            </div>
+            
+            <div id="orderDetailsContent">
+                <div class="loading">Loading order details...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Function to get status badge class
+        function getStatusBadgeClass(status) {
+            switch(status.toLowerCase()) {
+                case 'pending':
+                    return 'status-pending';
+                case 'processing':
+                    return 'status-processing';
+                case 'completed':
+                    return 'status-completed';
+                case 'cancelled':
+                    return 'status-cancelled';
+                case 'shipped':
+                    return 'status-shipped';
+                case 'delivered':
+                    return 'status-delivered';
+                default:
+                    return 'status-pending';
+            }
+        }
+        
+        // Function to get payment status badge class
+        function getPaymentStatusBadgeClass(status) {
+            switch(status.toLowerCase()) {
+                case 'completed':
+                    return 'payment-completed';
+                case 'pending':
+                    return 'payment-pending';
+                case 'failed':
+                    return 'payment-failed';
+                case 'cancelled':
+                    return 'payment-cancelled';
+                default:
+                    return 'payment-pending';
+            }
+        }
+        
+        // Function to format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+        
+        // Function to format currency
+        function formatCurrency(amount) {
+            return amount + ' EGP';
+        }
+        
+        // Function to load order details
+        async function loadOrderDetails() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const orderId = urlParams.get('id');
+                
+                if (!orderId) {
+                    throw new Error('No order ID provided');
+                }
+                
+                const response = await fetch(`api/order-details.php?id=${orderId}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayOrderDetails(data.data);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error loading order details:', error);
+                document.getElementById('orderDetailsContent').innerHTML = 
+                    `<div class="error">Error loading order details: ${error.message}</div>`;
+            }
+        }
+        
+        // Function to display order details
+        function displayOrderDetails(order) {
+            const container = document.getElementById('orderDetailsContent');
+            document.getElementById('orderTitle').textContent = `Order #${order.id}`;
+            
+            let html = `
+                <div class="order-info-grid">
+                    <div class="info-section">
+                        <h3>Order Information</h3>
+                        <div class="info-row">
+                            <span class="info-label">Order ID:</span>
+                            <span class="info-value">#${order.id}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Status:</span>
+                            <span class="info-value">
+                                <span class="status-badge ${getStatusBadgeClass(order.status)}">
+                                    ${order.status || 'Pending'}
+                                </span>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Created:</span>
+                            <span class="info-value">${formatDate(order.created_at)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Updated:</span>
+                            <span class="info-value">${order.updated_at ? formatDate(order.updated_at) : 'Never'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3>Customer Information</h3>
+                        <div class="info-row">
+                            <span class="info-label">Customer ID:</span>
+                            <span class="info-value">#${order.user_id}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Name:</span>
+                            <span class="info-value">${order.f_name || 'N/A'} ${order.l_name || ''}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Email:</span>
+                            <span class="info-value">${order.email || 'N/A'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Phone:</span>
+                            <span class="info-value">${order.phone_no || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add order items section
+            if (order.items && order.items.length > 0) {
+                html += `
+                    <div class="order-items-section">
+                        <h3>Order Items (${order.items.length})</h3>
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>SKU</th>
+                                    <th>Quantity</th>
+                                    <th>Price</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                order.items.forEach(item => {
+                    html += `
+                        <tr>
+                            <td>
+                                <div class="product-name">${item.product_name || 'Product #' + item.product_id}</div>
+                            </td>
+                            <td>${item.product_sku_id || 'N/A'}</td>
+                            <td>
+                                <span class="quantity-badge">${item.quantity}</span>
+                            </td>
+                            <td>${formatCurrency(item.price || 0)}</td>
+                            <td>${formatCurrency((item.price || 0) * item.quantity)}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="order-items-section">
+                        <h3>Order Items</h3>
+                        <div class="no-items">No items found for this order</div>
+                    </div>
+                `;
+            }
+            
+            // Add payment information section
+            if (order.payment) {
+                html += `
+                    <div class="payment-section">
+                        <h3>Payment Information</h3>
+                        <div class="info-row">
+                            <span class="info-label">Payment ID:</span>
+                            <span class="info-value">#${order.payment.payment_id}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Payment Status:</span>
+                            <span class="info-value">
+                                <span class="payment-status ${getPaymentStatusBadgeClass(order.payment.payment_status)}">
+                                    ${order.payment.payment_status || 'Pending'}
+                                </span>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Payment Amount:</span>
+                            <span class="info-value">${formatCurrency(order.payment.amount)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Payment Date:</span>
+                            <span class="info-value">${formatDate(order.payment.payment_date)}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="payment-section">
+                        <h3>Payment Information</h3>
+                        <div class="no-payment">No payment information available for this order</div>
+                    </div>
+                `;
+            }
+            
+            // Calculate the correct total (subtotal + tax)
+            const subtotal = parseFloat(order.total.replace(/,/g, ''));
+            const taxAmount = parseFloat(order.tax_amount.replace(/,/g, ''));
+            const finalTotal = subtotal + taxAmount;
+             
+             // Add totals section
+             html += `
+                 <div class="total-section">
+                     <div class="total-row">
+                         <span>Subtotal:</span>
+                         <span>${formatCurrency(order.total)}</span>
+                     </div>
+                     <div class="total-row">
+                         <span>Tax Rate:</span>
+                         <span>${order.tax_rate || 0}%</span>
+                     </div>
+                     <div class="total-row">
+                         <span>Tax Amount:</span>
+                         <span>${formatCurrency(order.tax_amount || 0)}</span>
+                     </div>
+                     <div class="total-row final">
+                         <span>Total:</span>
+                         <span>${formatCurrency(finalTotal.toFixed(2))}</span>
+                     </div>
+                 </div>
+             `;
+            
+            container.innerHTML = html;
+        }
+        
+        // Load order details when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOrderDetails();
+        });
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders - Store Dashboard</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <title>Document</title>
+ 
 </head>
 <body>
-     <div class="navbar">
+    <div class="navbar">
         <div class="left"> <img src="img/store logo with one element on a white background.png" alt=""></div>
         
         <div class="right">
@@ -19,16 +19,310 @@
         </div>
     </div>
     <div class="sidebar">
-      <ul>
-        <li><a href="#home">Dashboard</a></li>
-        <li><a href="#products">Products</a></li>
-        <li><a href="#about">About</a></li>
-        <li><a href="#contact">Contact</a></li>
-      </ul>
+        <ul>
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="order.html" class="active">Orders</a></li>
+            <li><a href="customers.html">Customers</a></li>
+            <li><a href="#">Marketing</a></li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports1">Reports <i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports1">
+                    <li><a href="#">Sales Report</a></li>
+                    <li><a href="#">Inventory Report</a></li>
+                    <li><a href="#">Business Report</a></li>
+                    <li><a href="#">Analytics Report</a></li>
+                    
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports2">Inventory<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports2">
+                    <li><a href="#">Items</a></li>
+                    <li><a href="#">Categories</a></li>
+                    <li><a href="#">Sub Categories</a></li>
+                    <li><a href="#">Suppliers</a></li>
+                    <li><a href="#">Purchase Orders</a></li>
+                    <li><a href="#">Transfer Orders</a></li>
+                    <li><a href="#">Invetory Count</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports3">Manage<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports3">
+                    <li><a href="#">Users</a></li>
+                    <li><a href="#">Roles</a></li>
+                    <li><a href="#">More</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+              <a href="#" class="reports-toggle" data-submenu="reports4">Marketing<i class="arrow-icon">▼</i></a>
+              <ul class="submenu" id="reports4">
+                <li><a href="#">Loyalty</a></li>
+                <li><a href="#">Discounts</a></li>
+                <li><a href="#">Promocodes</a></li>
+              </ul>
+          </li>
+        </ul>
     </div>
     <div class="content">
-        
+        <div class="orders-container">
+            <div class="orders-header">
+                <h1 class="orders-title">Orders Management</h1>
+                <div class="orders-count" id="ordersCount">Loading...</div>
+            </div>
+            
+            <!-- Search and Filter Section -->
+            <div class="search-filter-section">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search by Order ID or User Name..." class="search-input">
+                    <button onclick="searchOrders()" class="search-btn">Search</button>
+                    <button onclick="clearSearch()" class="clear-btn">Clear</button>
+                </div>
+                
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="startDate">Start Date:</label>
+                        <input type="date" id="startDate" class="date-input">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="endDate">End Date:</label>
+                        <input type="date" id="endDate" class="date-input">
+                    </div>
+                    <button onclick="filterByDate()" class="filter-btn">Filter</button>
+                    <button onclick="clearDateFilter()" class="clear-btn">Clear</button>
+                </div>
+            </div>
+            
+            <div id="ordersTableContainer">
+                <div class="loading">Loading orders...</div>
+            </div>
+        </div>
     </div>
-     <script src="script.js"></script>
+    
+    <script>
+        // Function to get status badge class
+        function getStatusBadgeClass(status) {
+            switch(status.toLowerCase()) {
+                case 'pending':
+                    return 'status-pending';
+                case 'processing':
+                    return 'status-processing';
+                case 'completed':
+                    return 'status-completed';
+                case 'cancelled':
+                    return 'status-cancelled';
+                default:
+                    return 'status-pending';
+            }
+        }
+        
+        // Function to format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+        
+        // Function to load orders
+        async function loadOrders() {
+            try {
+                const response = await fetch('api/orders.php');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayOrders(data.data);
+                    document.getElementById('ordersCount').textContent = `${data.count} Orders`;
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                document.getElementById('ordersTableContainer').innerHTML = 
+                    `<div class="error">Error loading orders: ${error.message}</div>`;
+            }
+        }
+        
+        // Function to display orders in table
+        function displayOrders(orders) {
+            const container = document.getElementById('ordersTableContainer');
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<div class="no-orders">No orders found</div>';
+                return;
+            }
+            
+            let tableHTML = `
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable-header" onclick="sortTable('id')" data-sort="id">Order ID ↕</th>
+                            <th class="sortable-header" onclick="sortTable('user_id')" data-sort="user_id">User ID ↕</th>
+                            <th>User Name</th>
+                            <th>Items (Count)</th>
+                            <th class="sortable-header" onclick="sortTable('total')" data-sort="total">Total ↕</th>
+                            <th class="sortable-header" onclick="sortTable('tax_amount')" data-sort="tax_amount">Tax Amount ↕</th>
+                            <th>Tax Rate</th>
+                            <th class="sortable-header" onclick="sortTable('status')" data-sort="status">Status ↕</th>
+                            <th class="sortable-header" onclick="sortTable('created_at')" data-sort="created_at">Date ↕</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+                                                  orders.forEach(order => {
+                 tableHTML += `
+                     <tr class="clickable-row" onclick="openOrderDetails(${order.id})">
+                         <td>
+                             <div class="order-number">Order #${order.id}</div>
+                         </td>
+                         <td>
+                             <div class="customer-info">${order.user_id}</div>
+                         </td>
+                         <td>
+                             <div class="customer-info">${order.f_name || 'N/A'} ${order.l_name || ''}</div>
+                         </td>
+                         <td>
+                             <div class="order-details">
+                                 <strong>${order.total_items || 0} items</strong><br>
+                                 ${order.order_items || 'No items'}
+                             </div>
+                         </td>
+                         <td>
+                             <div class="total-amount">${order.total} EGP</div>
+                         </td>
+                         <td>
+                             <div>${order.tax_amount || '0.00'} EGP</div>
+                         </td>
+                         <td>
+                             <div>${order.tax_rate || '0'}%</div>
+                         </td>
+                         <td>
+                             <span class="status-badge ${getStatusBadgeClass(order.status)}">
+                                 ${order.status || 'Pending'}
+                             </span>
+                         </td>
+                         <td>
+                             <div class="date-time">${formatDate(order.created_at)}</div>
+                             ${order.updated_at ? `<div class="date-time">Updated: ${formatDate(order.updated_at)}</div>` : ''}
+                         </td>
+                     </tr>
+                 `;
+             });
+            
+            tableHTML += `
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = tableHTML;
+        }
+        
+        // Global variables for search and sorting
+        let currentSearch = '';
+        let currentStartDate = '';
+        let currentEndDate = '';
+        let currentSortBy = 'created_at';
+        let currentSortOrder = 'DESC';
+        
+        // Function to search orders
+        function searchOrders() {
+            currentSearch = document.getElementById('searchInput').value;
+            loadOrders();
+        }
+        
+        // Function to clear search
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            currentSearch = '';
+            loadOrders();
+        }
+        
+        // Function to filter by date
+        function filterByDate() {
+            currentStartDate = document.getElementById('startDate').value;
+            currentEndDate = document.getElementById('endDate').value;
+            loadOrders();
+        }
+        
+        // Function to clear date filter
+        function clearDateFilter() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            currentStartDate = '';
+            currentEndDate = '';
+            loadOrders();
+        }
+        
+        // Function to sort table
+        function sortTable(sortBy) {
+            if (currentSortBy === sortBy) {
+                // Toggle sort order if clicking the same column
+                currentSortOrder = currentSortOrder === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                // Set new sort column and default to ASC
+                currentSortBy = sortBy;
+                currentSortOrder = 'ASC';
+            }
+            loadOrders();
+        }
+        
+        // Function to load orders with current filters
+        async function loadOrders() {
+            try {
+                const params = new URLSearchParams();
+                if (currentSearch) params.append('search', currentSearch);
+                if (currentStartDate) params.append('start_date', currentStartDate);
+                if (currentEndDate) params.append('end_date', currentEndDate);
+                if (currentSortBy) params.append('sort_by', currentSortBy);
+                if (currentSortOrder) params.append('sort_order', currentSortOrder);
+                
+                const response = await fetch(`api/orders.php?${params.toString()}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayOrders(data.data);
+                    document.getElementById('ordersCount').textContent = `${data.count} Orders`;
+                    updateSortHeaders();
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                document.getElementById('ordersTableContainer').innerHTML = 
+                    `<div class="error">Error loading orders: ${error.message}</div>`;
+            }
+        }
+        
+        // Function to update sort header indicators
+        function updateSortHeaders() {
+            const headers = document.querySelectorAll('.sortable-header');
+            headers.forEach(header => {
+                header.classList.remove('asc', 'desc');
+                const sortField = header.getAttribute('data-sort');
+                if (sortField === currentSortBy) {
+                    header.classList.add(currentSortOrder.toLowerCase());
+                }
+            });
+        }
+        
+        // Function to open order details page
+        function openOrderDetails(orderId) {
+            window.location.href = `order-details.html?id=${orderId}`;
+        }
+        
+        // Load orders when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOrders();
+            
+            // Add enter key support for search
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchOrders();
+                }
+            });
+        });
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

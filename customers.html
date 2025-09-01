@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customers - Store Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+  
+</head>
+<body>
+    <div class="navbar">
+        <div class="left"> <img src="img/store logo with one element on a white background.png" alt=""></div>
+        
+        <div class="right">
+            <img src="img/bell-solid.svg" alt="Security">
+            <img src="img/user-solid.svg" alt="Logout">
+        </div>
+    </div>
+    <div class="sidebar">
+        <ul>
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="order.html">Orders</a></li>
+            <li><a href="customers.html" class="active">Customers</a></li>
+            <li><a href="#">Marketing</a></li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports1">Reports <i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports1">
+                    <li><a href="#">Sales Report</a></li>
+                    <li><a href="#">Inventory Report</a></li>
+                    <li><a href="#">Business Report</a></li>
+                    <li><a href="#">Analytics Report</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports2">Inventory<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports2">
+                    <li><a href="#">Items</a></li>
+                    <li><a href="#">Categories</a></li>
+                    <li><a href="#">Sub Categories</a></li>
+                    <li><a href="#">Suppliers</a></li>
+                    <li><a href="#">Purchase Orders</a></li>
+                    <li><a href="#">Transfer Orders</a></li>
+                    <li><a href="#">Inventory Count</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports3">Manage<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports3">
+                    <li><a href="#">Users</a></li>
+                    <li><a href="#">Roles</a></li>
+                    <li><a href="#">More</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+              <a href="#" class="reports-toggle" data-submenu="reports4">Marketing<i class="arrow-icon">▼</i></a>
+              <ul class="submenu" id="reports4">
+                <li><a href="#">Loyalty</a></li>
+                <li><a href="#">Discounts</a></li>
+                <li><a href="#">Promocodes</a></li>
+              </ul>
+          </li>
+        </ul>
+    </div>
+    <div class="content">
+        <div class="customers-container">
+            <div class="customers-header">
+                <h1 class="customers-title">Customer Management</h1>
+                <div class="customers-count" id="customersCount">Loading...</div>
+            </div>
+            
+            <!-- Search and Filter Section -->
+            <div class="search-filter-section">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search by Customer ID, Name, Email, or Phone..." class="search-input">
+                    <button onclick="searchCustomers()" class="search-btn">Search</button>
+                    <button onclick="clearSearch()" class="clear-btn">Clear</button>
+                </div>
+                
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="startDate">Start Date:</label>
+                        <input type="date" id="startDate" class="date-input">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="endDate">End Date:</label>
+                        <input type="date" id="endDate" class="date-input">
+                    </div>
+                    <button onclick="filterByDate()" class="filter-btn">Filter</button>
+                    <button onclick="clearDateFilter()" class="clear-btn">Clear</button>
+                </div>
+            </div>
+            
+            <div id="customersTableContainer">
+                <div class="loading">Loading customers...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Function to get status badge class
+        function getStatusBadgeClass(status) {
+            switch(status.toLowerCase()) {
+                case 'active':
+                    return 'status-active';
+                case 'inactive':
+                    return 'status-inactive';
+                case 'pending':
+                    return 'status-pending';
+                default:
+                    return 'status-pending';
+            }
+        }
+        
+        // Function to format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+        
+        // Function to load customers
+        async function loadCustomers() {
+            try {
+                const response = await fetch('api/customers.php');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayCustomers(data.data);
+                    document.getElementById('customersCount').textContent = `${data.count} Customers`;
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error loading customers:', error);
+                document.getElementById('customersTableContainer').innerHTML = 
+                    `<div class="error">Error loading customers: ${error.message}</div>`;
+            }
+        }
+        
+        // Function to display customers
+        function displayCustomers(customers) {
+            const container = document.getElementById('customersTableContainer');
+            
+            if (!customers || customers.length === 0) {
+                container.innerHTML = '<div class="no-customers">No customers found</div>';
+                return;
+            }
+            
+            let html = `
+                <table class="customers-table">
+                    <thead>
+                                                 <tr>
+                             <th class="sortable-header" onclick="sortTable('id')">Customer ID</th>
+                             <th class="sortable-header" onclick="sortTable('f_name')">Name</th>
+                             <th class="sortable-header" onclick="sortTable('email')">Email</th>
+                             <th class="sortable-header" onclick="sortTable('phone_no')">Phone</th>
+                             <th class="sortable-header" onclick="sortTable('status')">Status</th>
+                             <th class="sortable-header" onclick="sortTable('created_at')">Created</th>
+                             <th class="sortable-header" onclick="sortTable('last_order_date')">Last Order</th>
+                             <th class="sortable-header" onclick="sortTable('total_orders')">Total Orders</th>
+                             <th class="sortable-header" onclick="sortTable('total_spent')">Total Spent</th>
+                         </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            customers.forEach(customer => {
+                html += `
+                    <tr class="clickable-row" onclick="openCustomerDetails(${customer.id})">
+                        <td>
+                            <div class="customer-id">#${customer.id}</div>
+                        </td>
+                        <td>
+                            <div class="customer-name">${customer.f_name || 'N/A'} ${customer.l_name || ''}</div>
+                        </td>
+                        <td>
+                            <div class="customer-email">${customer.email || 'N/A'}</div>
+                        </td>
+                        <td>
+                            <div class="customer-phone">${customer.phone_no || 'N/A'}</div>
+                        </td>
+                        <td>
+                            <span class="customer-status ${getStatusBadgeClass(customer.status)}">
+                                ${customer.status || 'Active'}
+                            </span>
+                        </td>
+                                                 <td>
+                             <div>${formatDate(customer.created_at)}</div>
+                         </td>
+                         <td>
+                             <div>${customer.last_order_date === 'No orders' ? 'No orders' : formatDate(customer.last_order_date)}</div>
+                         </td>
+                         <td>
+                             <div>${customer.total_orders || 0}</div>
+                         </td>
+                         <td>
+                             <div>${customer.total_spent || '0.00'} EGP</div>
+                         </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = html;
+        }
+        
+        // Function to search customers
+        async function searchCustomers() {
+            const searchTerm = document.getElementById('searchInput').value.trim();
+            if (!searchTerm) {
+                loadCustomers();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`api/customers.php?search=${encodeURIComponent(searchTerm)}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayCustomers(data.data);
+                    document.getElementById('customersCount').textContent = `${data.count} Customers Found`;
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error searching customers:', error);
+                document.getElementById('customersTableContainer').innerHTML = 
+                    `<div class="error">Error searching customers: ${error.message}</div>`;
+            }
+        }
+        
+        // Function to clear search
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            loadCustomers();
+        }
+        
+        // Function to filter by date
+        async function filterByDate() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate && !endDate) {
+                loadCustomers();
+                return;
+            }
+            
+            try {
+                const params = new URLSearchParams();
+                if (startDate) params.append('start_date', startDate);
+                if (endDate) params.append('end_date', endDate);
+                
+                const response = await fetch(`api/customers.php?${params.toString()}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayCustomers(data.data);
+                    document.getElementById('customersCount').textContent = `${data.count} Customers Found`;
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error filtering customers:', error);
+                document.getElementById('customersTableContainer').innerHTML = 
+                    `<div class="error">Error filtering customers: ${error.message}</div>`;
+            }
+        }
+        
+        // Function to clear date filter
+        function clearDateFilter() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            loadCustomers();
+        }
+        
+        // Function to sort table
+        async function sortTable(column) {
+            const currentSort = document.querySelector('.sortable-header.sort-asc, .sortable-header.sort-desc');
+            let sortOrder = 'asc';
+            
+            if (currentSort && currentSort.textContent.toLowerCase().includes(column)) {
+                sortOrder = currentSort.classList.contains('sort-asc') ? 'desc' : 'asc';
+            }
+            
+            try {
+                const response = await fetch(`api/customers.php?sort_by=${column}&sort_order=${sortOrder}`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayCustomers(data.data);
+                    updateSortHeaders(column, sortOrder);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error('Error sorting customers:', error);
+            }
+        }
+        
+        // Function to update sort headers
+        function updateSortHeaders(activeColumn, sortOrder) {
+            const headers = document.querySelectorAll('.sortable-header');
+            headers.forEach(header => {
+                header.classList.remove('sort-asc', 'sort-desc');
+                if (header.textContent.toLowerCase().includes(activeColumn)) {
+                    header.classList.add(sortOrder === 'asc' ? 'sort-asc' : 'sort-desc');
+                }
+            });
+        }
+        
+        // Function to open customer details
+        function openCustomerDetails(customerId) {
+            window.location.href = `customer-details.html?id=${customerId}`;
+        }
+        
+        // Load customers when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCustomers();
+            
+            // Add enter key listener for search
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchCustomers();
+                }
+            });
+        });
+    </script>
+    
+    <script src="script.js"></script>
+</body>
+</html>

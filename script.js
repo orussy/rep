@@ -232,36 +232,8 @@ function toggleSubmenu(submenuId) {
     }
 }
 
-// Initialize dashboard when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard initializing...');
-    
-    // Set today's date as default in the date picker
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('datePicker').value = today;
-    currentSelectedDate = today;
-    
-    // Fetch initial data for today
-    fetchDashboardData(today);
-    
-    // Set up auto-refresh every 5 minutes
-    setInterval(refreshDashboard, 5 * 60 * 1000);
-    
-    // Add refresh button functionality
-    const refreshButtons = document.querySelectorAll('.refresh-btn');
-    refreshButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('Manual refresh triggered');
-            refreshDashboard();
-        });
-    });
-    
-    // Add date selection functionality
-    document.getElementById('loadDateBtn').addEventListener('click', loadDateData);
-    document.getElementById('todayBtn').addEventListener('click', loadTodayData);
-    
-    // Add submenu toggle functionality for all submenus
+// Function to initialize submenu functionality
+function initializeSubmenus() {
     const submenuToggles = document.querySelectorAll('.reports-toggle');
     submenuToggles.forEach(toggle => {
         toggle.addEventListener('click', function(e) {
@@ -270,6 +242,48 @@ document.addEventListener('DOMContentLoaded', function() {
             toggleSubmenu(submenuId);
         });
     });
+    console.log('Submenus initialized');
+}
+
+// Initialize dashboard when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Page initializing...');
     
-    console.log('Dashboard initialized successfully');
+    // Initialize submenus on all pages
+    initializeSubmenus();
+    
+    // Check if we're on the dashboard page
+    const datePicker = document.getElementById('datePicker');
+    if (datePicker) {
+        console.log('Dashboard initializing...');
+        
+        // Set today's date as default in the date picker
+        const today = new Date().toISOString().split('T')[0];
+        datePicker.value = today;
+        currentSelectedDate = today;
+        
+        // Fetch initial data for today
+        fetchDashboardData(today);
+        
+        // Set up auto-refresh every 5 minutes
+        setInterval(refreshDashboard, 5 * 60 * 1000);
+        
+        // Add refresh button functionality
+        const refreshButtons = document.querySelectorAll('.refresh-btn');
+        refreshButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Manual refresh triggered');
+                refreshDashboard();
+            });
+        });
+        
+        // Add date selection functionality
+        document.getElementById('loadDateBtn').addEventListener('click', loadDateData);
+        document.getElementById('todayBtn').addEventListener('click', loadTodayData);
+        
+        console.log('Dashboard initialized successfully');
+    } else {
+        console.log('Non-dashboard page initialized');
+    }
 });
