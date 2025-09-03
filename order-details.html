@@ -25,7 +25,7 @@
             <li class="sidebar-item">
                 <a href="#" class="reports-toggle" data-submenu="reports1">Reports <i class="arrow-icon">▼</i></a>
                 <ul class="submenu" id="reports1">
-                     <li><a href="#">Sales Report</a></li>
+                     <li><a href="sales-report.html">Sales Report</a></li>
                      <li><a href="#">Inventory Report</a></li>
                      <li><a href="#">Business Report</a></li>
                      <li><a href="#">Analytics Report</a></li>
@@ -148,6 +148,25 @@
         }
         
         // Function to display order details
+        async function advanceOrderStatus(orderId, targetStatus) {
+            try {
+                const response = await fetch('api/update-order-status.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_id: orderId, target_status: targetStatus })
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    await loadOrderDetails();
+                } else {
+                    alert(result.message || 'Status cannot be changed');
+                }
+            } catch (e) {
+                alert('Failed to update status');
+                console.error(e);
+            }
+        }
+
         function displayOrderDetails(order) {
             const container = document.getElementById('orderDetailsContent');
             document.getElementById('orderTitle').textContent = `Order #${order.id}`;
@@ -168,6 +187,20 @@
                                 </span>
                             </span>
                         </div>
+                        ${(() => { const s=(order.status||'').toLowerCase(); if (['cancelled','canceled','completed','delivered'].includes(s)) { return ''; } if (s==='pending') { return `
+                        <div class=\"info-row\">
+                            <span class=\"info-label\">Change Status:</span>
+                            <span class=\"info-value\">
+                                <button class=\"filter-btn\" id=\"btnShip\">Mark as Shipped</button>
+                                <button class=\"load-date-btn\" id=\"btnDeliver\" style=\"margin-left:8px;\">Mark as Delivered</button>
+                            </span>
+                        </div>`;} if (s==='shipped'){ return `
+                        <div class=\"info-row\">
+                            <span class=\"info-label\">Change Status:</span>
+                            <span class=\"info-value\">
+                                <button class=\"load-date-btn\" id=\"btnDeliver\">Mark as Delivered</button>
+                            </span>
+                        </div>`;} return ''; })()}
                         <div class="info-row">
                             <span class="info-label">Created:</span>
                             <span class="info-value">${formatDate(order.created_at)}</span>
@@ -196,6 +229,41 @@
                             <span class="info-label">Phone:</span>
                             <span class="info-value">${order.phone_no || 'N/A'}</span>
                         </div>
+                    </div>
+                    <div class="info-section">
+                        <h3>Shipping Address</h3>
+                        ${order.address ? `
+                        <div class="info-row">
+                            <span class="info-label">Title:</span>
+                            <span class="info-value">${order.address.title || ''}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Address 1:</span>
+                            <span class="info-value">${order.address.address1 || ''}</span>
+                        </div>
+                        ${order.address.address2 ? `
+                        <div class="info-row">
+                            <span class="info-label">Address 2:</span>
+                            <span class="info-value">${order.address.address2}</span>
+                        </div>` : ''}
+                        <div class="info-row">
+                            <span class="info-label">City:</span>
+                            <span class="info-value">${order.address.city || ''}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Country:</span>
+                            <span class="info-value">${order.address.country || ''}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Postal Code:</span>
+                            <span class="info-value">${order.address.postal_code || ''}</span>
+                        </div>
+                        ` : `
+                        <div class="info-row">
+                            <span class="info-label">Address:</span>
+                            <span class="info-value">No saved address</span>
+                        </div>
+                        `}
                     </div>
                 </div>
             `;
@@ -258,6 +326,10 @@
                             <span class="info-value">#${order.payment.payment_id}</span>
                         </div>
                         <div class="info-row">
+                            <span class="info-label">Provider:</span>
+                            <span class="info-value">${order.payment.provider || 'N/A'}</span>
+                        </div>
+                        <div class="info-row">
                             <span class="info-label">Payment Status:</span>
                             <span class="info-value">
                                 <span class="payment-status ${getPaymentStatusBadgeClass(order.payment.payment_status)}">
@@ -284,17 +356,23 @@
                 `;
             }
             
-            // Calculate the correct total (subtotal + tax)
-            const subtotal = parseFloat(order.total.replace(/,/g, ''));
-            const taxAmount = parseFloat(order.tax_amount.replace(/,/g, ''));
-            const finalTotal = subtotal + taxAmount;
-             
+            // Calculate totals including discount
+            const subtotal = parseFloat(((order.items_subtotal || order.total) + '').replace(/,/g, ''));
+            const discountAmount = parseFloat(((order.discount_amount || 0) + '').replace(/,/g, ''));
+            const taxAmount = parseFloat(((order.tax_amount || 0) + '').replace(/,/g, ''));
+            const netSubtotal = Math.max(0, subtotal - discountAmount);
+            const finalTotal = netSubtotal + taxAmount;
+            
              // Add totals section
              html += `
                  <div class="total-section">
                      <div class="total-row">
                          <span>Subtotal:</span>
-                         <span>${formatCurrency(order.total)}</span>
+                         <span>${formatCurrency((order.items_subtotal || order.total))}</span>
+                     </div>
+                     <div class="total-row">
+                         <span>Discount:</span>
+                         <span>-${formatCurrency((order.discount_amount || 0))}</span>
                      </div>
                      <div class="total-row">
                          <span>Tax Rate:</span>
@@ -312,6 +390,16 @@
              `;
             
             container.innerHTML = html;
+
+            // Attach action buttons
+            const btnShip = document.getElementById('btnShip');
+            if (btnShip) {
+                btnShip.addEventListener('click', function(){ advanceOrderStatus(order.id, 'shipped'); });
+            }
+            const btnDeliver = document.getElementById('btnDeliver');
+            if (btnDeliver) {
+                btnDeliver.addEventListener('click', function(){ advanceOrderStatus(order.id, 'delivered'); });
+            }
         }
         
         // Load order details when page loads

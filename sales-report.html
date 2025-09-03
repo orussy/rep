@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Reports - Product Sales</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="navbar">
+        <div class="left"> <img src="img/store logo with one element on a white background.png" alt=""></div>
+        <div class="right">
+            <img src="img/bell-solid.svg" alt="Security">
+            <img src="img/user-solid.svg" alt="Logout">
+        </div>
+    </div>
+    <div class="sidebar">
+        <ul>
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="order.html">Orders</a></li>
+            <li><a href="customers.html">Customers</a></li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle active" data-submenu="reports1">Reports <i class="arrow-icon">▼</i></a>
+                <ul class="submenu active" id="reports1">
+                    <li><a href="sales-report.html">Sales Report</a></li>
+                    <li><a href="sales-report.html">Inventory Report</a></li>
+                    <li><a href="#">Business Report</a></li>
+                    <li><a href="#">Analytics Report</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports2">Inventory<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports2">
+                    <li><a href="#">Items</a></li>
+                    <li><a href="#">Categories</a></li>
+                    <li><a href="#">Sub Categories</a></li>
+                    <li><a href="#">Suppliers</a></li>
+                    <li><a href="#">Purchase Orders</a></li>
+                    <li><a href="#">Transfer Orders</a></li>
+                    <li><a href="#">Invetory Count</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports3">Manage<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports3">
+                    <li><a href="#">Users</a></li>
+                    <li><a href="#">Roles</a></li>
+                    <li><a href="#">More</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+              <a href="#" class="reports-toggle" data-submenu="reports4">Marketing<i class="arrow-icon">▼</i></a>
+              <ul class="submenu" id="reports4">
+                <li><a href="#">Loyalty</a></li>
+                <li><a href="#">Discounts</a></li>
+                <li><a href="#">Promocodes</a></li>
+              </ul>
+        </ul>
+    </div>
+    <div class="content">
+        <!-- Report selection board -->
+        <div class="customers-container" id="reportBoard">
+            <div class="customers-header">
+                <h2 class="customers-title">Sales Reports</h2>
+                <div class="customers-count">Choose a report</div>
+            </div>
+            <div class="dashboard" style="gap: 20px;">
+                <div class="card clickable-row" id="openProductSales" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3>Product Sales</h3>
+                    </div>
+                    <p class="date-time">By product with totals and revenue</p>
+                </div>
+                <div class="card clickable-row" id="openRegionSales" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3>Sales by Region</h3>
+                    </div>
+                    <p class="date-time">Map with orders by city</p>
+                </div>
+                <div class="card clickable-row" id="openPaymentReport" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3>Payments Report</h3>
+                    </div>
+                    <p class="date-time">Payments by date, provider, and status</p>
+                </div>
+                <div class="card" style="opacity:.6;">
+                    <div class="card-header">
+                        <h3>Top Performers</h3>
+                    </div>
+                    <p class="date-time">Coming soon</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Sales section -->
+        <div class="customers-container" id="productSalesSection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Product Sales Report</h2>
+                <div>
+                    <button id="backToBoard" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="reportCount">0 Products</span>
+                </div>
+            </div>
+
+            <div class="search-filter-section">
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="startDate">Start Date</label>
+                        <input type="date" id="startDate" class="date-input">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="endDate">End Date</label>
+                        <input type="date" id="endDate" class="date-input">
+                    </div>
+                    <button id="applyFilters" class="filter-btn">Apply</button>
+                    <button id="clearFilters" class="clear-btn">Clear</button>
+                    <button id="exportCsv" class="load-date-btn" style="margin-left:auto;">Export CSV</button>
+                </div>
+            </div>
+
+            <table class="customers-table" id="productSalesTable">
+                <thead>
+                    <tr>
+                        <th class="sortable-header" data-key="product_id">Product ID</th>
+                        <th class="sortable-header" data-key="product_name">Product Name</th>
+                        <th class="sortable-header" data-key="category">Category</th>
+                        <th class="sortable-header" data-key="total_orders">Total Orders</th>
+                        <th class="sortable-header" data-key="units_sold">Units Sold</th>
+                        <th class="sortable-header" data-key="total_revenue">Total Revenue</th>
+                        <th class="sortable-header" data-key="avg_selling_price">Avg. Selling Price</th>
+                        <th class="sortable-header" data-key="returns">Returns</th>
+                        <th class="sortable-header" data-key="last_sold_date">Last Sold Date</th>
+                    </tr>
+                </thead>
+                <tbody id="productSalesBody">
+                    <tr><td colspan="10" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Sales by Region section -->
+        <div class="customers-container" id="regionSalesSection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Sales by Region</h2>
+                <div>
+                    <button id="backToBoard2" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="regionCount">0 Cities</span>
+                </div>
+            </div>
+            <div class="search-filter-section">
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="regionStartDate">Start Date</label>
+                        <input type="date" id="regionStartDate" class="date-input">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="regionEndDate">End Date</label>
+                        <input type="date" id="regionEndDate" class="date-input">
+                    </div>
+                    <button id="applyRegionFilters" class="filter-btn">Apply</button>
+                    <button id="clearRegionFilters" class="clear-btn">Clear</button>
+                </div>
+            </div>
+            <div id="regionMap" style="height: 520px; border-radius: 8px; overflow: hidden; border: 1px solid #eee;"></div>
+        </div>
+
+        <!-- Payments Report section -->
+        <div class="customers-container" id="paymentReportSection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Payments Report</h2>
+                <div>
+                    <button id="backToBoard3" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="paymentCount">0 Payments</span>
+                </div>
+            </div>
+            <div class="search-filter-section">
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="payStartDate">Start Date</label>
+                        <input type="date" id="payStartDate" class="date-input">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="payEndDate">End Date</label>
+                        <input type="date" id="payEndDate" class="date-input">
+                    </div>
+                    <button id="applyPayFilters" class="filter-btn">Apply</button>
+                    <button id="clearPayFilters" class="clear-btn">Clear</button>
+                    <button id="exportPayCsv" class="load-date-btn" style="margin-left:auto;">Export CSV</button>
+                </div>
+            </div>
+
+            
+
+            <table class="customers-table" id="paymentTable">
+                <thead>
+                    <tr>
+                        <th>Payment Method</th>
+                        <th>Number of Orders</th>
+                        <th>Total Amount</th>
+                    </tr>
+                </thead>
+                <tbody id="paymentMethodSummaryBody">
+                    <tr><td colspan="3" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="script.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const board = document.getElementById('reportBoard');
+        const productSection = document.getElementById('productSalesSection');
+        const regionSection = document.getElementById('regionSalesSection');
+        const paymentSection = document.getElementById('paymentReportSection');
+
+        function showBoard() {
+            board.style.display = '';
+            productSection.style.display = 'none';
+            regionSection.style.display = 'none';
+            paymentSection.style.display = 'none';
+        }
+        function showProductSales() {
+            board.style.display = 'none';
+            productSection.style.display = '';
+        }
+        function showRegionSales() {
+            board.style.display = 'none';
+            regionSection.style.display = '';
+        }
+        function fetchRegionSales() {
+            const start = document.getElementById('regionStartDate').value;
+            const end = document.getElementById('regionEndDate').value;
+            let url = 'api/sales-by-region.php';
+            const params = [];
+            if (start) params.push('start_date=' + encodeURIComponent(start));
+            if (end) params.push('end_date=' + encodeURIComponent(end));
+            if (params.length) url += '?' + params.join('&');
+
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    regionData = Array.isArray(res.data) ? res.data : [];
+                    document.getElementById('regionCount').textContent = (res.count || 0) + ' Cities';
+                    // Lazy init map
+                    let mapEl = document.getElementById('regionMap');
+                    if (!regionMap) {
+                        regionMap = L.map(mapEl).setView([26.8206, 30.8025], 5);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 18,
+                            attribution: '&copy; OpenStreetMap contributors'
+                        }).addTo(regionMap);
+                    }
+                    // Clear old markers
+                    if (regionMarkers && regionMarkers.length) {
+                        regionMarkers.forEach(m => regionMap.removeLayer(m));
+                    }
+                    regionMarkers = [];
+                    const bounds = [];
+                    regionData.forEach(row => {
+                        if (!row.lat || !row.lng) return;
+                        const circle = L.circleMarker([row.lat, row.lng], {
+                            radius: Math.max(8, Math.min(40, (row.orders_count || 0) * 4)),
+                            color: '#2563eb',
+                            weight: 2,
+                            fillColor: '#3b82f6',
+                            fillOpacity: 0.35
+                        }).addTo(regionMap);
+                        circle.bindTooltip(`${row.city}, ${row.country}<br/>Orders: ${row.orders_count}<br/>${row.orders_customers || ''}`);
+                        regionMarkers.push(circle);
+                        bounds.push([row.lat, row.lng]);
+                    });
+                    if (bounds.length) regionMap.fitBounds(bounds, { padding: [30, 30] });
+                })
+                .catch(err => console.error('Failed to load region report', err));
+        }
+        function showPaymentReport() {
+            board.style.display = 'none';
+            paymentSection.style.display = '';
+        }
+
+        let reportData = [];
+        let regionData = [];
+        let regionMap = null;
+        let regionMarkers = [];
+        let sortState = { key: null, direction: 'asc' };
+        let payData = [];
+        let paySortState = { key: null, direction: 'asc' };
+
+        function compareValues(a, b, key) {
+            const numericKeys = new Set(['product_id','total_orders','units_sold','total_revenue','avg_selling_price','returns']);
+            const dateKeys = new Set(['last_sold_date']);
+
+            let valA = a[key];
+            let valB = b[key];
+
+            if (numericKeys.has(key)) {
+                valA = parseFloat(valA || 0);
+                valB = parseFloat(valB || 0);
+            } else if (dateKeys.has(key)) {
+                valA = valA ? new Date(valA).getTime() : 0;
+                valB = valB ? new Date(valB).getTime() : 0;
+            } else {
+                valA = (valA || '').toString().toLowerCase();
+                valB = (valB || '').toString().toLowerCase();
+            }
+
+            if (valA < valB) return -1;
+            if (valA > valB) return 1;
+            return 0;
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('productSalesBody');
+            if (!reportData.length) {
+                tbody.innerHTML = '<tr><td colspan="10" class="no-customers">No data</td></tr>';
+                return;
+            }
+
+            let rowsData = [...reportData];
+            if (sortState.key) {
+                rowsData.sort((a, b) => {
+                    const cmp = compareValues(a, b, sortState.key);
+                    return sortState.direction === 'asc' ? cmp : -cmp;
+                });
+            }
+
+            const rows = rowsData.map(item => {
+                const totalRevenue = Number(item.total_revenue).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const avgPrice = Number(item.avg_selling_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                return `<tr>
+                    <td>${item.product_id}</td>
+                    <td class="product-name">${item.product_name || ''}</td>
+                    <td>${item.category || ''}</td>
+                    <td>${item.total_orders}</td>
+                    <td>${item.units_sold}</td>
+                    <td>EGP ${totalRevenue}</td>
+                    <td>EGP ${avgPrice}</td>
+                    <td>${item.returns || 0}</td>
+                    <td>${item.last_sold_date ? item.last_sold_date : ''}</td>
+                </tr>`;
+            }).join('');
+            tbody.innerHTML = rows;
+        }
+
+        function toCsvValue(value) {
+            if (value === null || value === undefined) return '';
+            const str = value.toString();
+            if (/[",\n]/.test(str)) {
+                return '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        }
+
+        function exportCsv() {
+            const headers = [
+                'Product ID','Product Name','Category','Total Orders','Units Sold','Total Revenue','Avg. Selling Price','Returns','Last Sold Date'
+            ];
+
+            let rowsData = [...reportData];
+            if (sortState.key) {
+                rowsData.sort((a, b) => {
+                    const cmp = compareValues(a, b, sortState.key);
+                    return sortState.direction === 'asc' ? cmp : -cmp;
+                });
+            }
+
+            const lines = [];
+            lines.push(headers.map(toCsvValue).join(','));
+            rowsData.forEach(item => {
+                lines.push([
+                    item.product_id,
+                    item.product_name || '',
+                    item.category || '',
+                    item.total_orders,
+                    item.units_sold,
+                    Number(item.total_revenue).toFixed(2),
+                    Number(item.avg_selling_price).toFixed(2),
+                    item.returns || 0,
+                    item.last_sold_date || ''
+                ].map(toCsvValue).join(','));
+            });
+
+            const csvContent = '\ufeff' + lines.join('\n'); // BOM for Excel UTF-8
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const start = document.getElementById('startDate').value || 'all';
+            const end = document.getElementById('endDate').value || 'all';
+            link.href = url;
+            link.download = `product-sales_${start}_to_${end}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function fetchProductSales() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            let url = 'api/product-sales-report.php';
+            const params = [];
+            if (start) params.push('start_date=' + encodeURIComponent(start));
+            if (end) params.push('end_date=' + encodeURIComponent(end));
+            if (params.length) url += '?' + params.join('&');
+
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    const tbody = document.getElementById('productSalesBody');
+                    tbody.innerHTML = '';
+                    if (res.status !== 'success' || !Array.isArray(res.data) || res.data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="10" class="no-customers">No data</td></tr>';
+                        document.getElementById('reportCount').textContent = '0 Products';
+                        reportData = [];
+                        return;
+                    }
+
+                    document.getElementById('reportCount').textContent = res.count + ' Products';
+                    reportData = res.data;
+                    renderTable();
+                })
+                .catch(err => {
+                    const tbody = document.getElementById('productSalesBody');
+                    tbody.innerHTML = '<tr><td colspan="10" class="error">Failed to load report</td></tr>';
+                    console.error(err);
+                });
+        }
+
+        function setSortIndicators() {
+            const headers = document.querySelectorAll('#productSalesTable thead th.sortable-header');
+            headers.forEach(h => {
+                h.classList.remove('asc');
+                h.classList.remove('desc');
+                const key = h.getAttribute('data-key');
+                if (key === sortState.key) {
+                    h.classList.add(sortState.direction === 'asc' ? 'asc' : 'desc');
+                }
+            });
+        }
+        function setPaySortIndicators() {}
+
+        function renderPayTable() {}
+
+        function exportPayCsv() {
+            const headers = ['Payment Method','Number of Orders','Total Amount'];
+            const providers = lastSummary.by_provider || {};
+            const counts = lastSummary.by_provider_counts || {};
+            const rows = Object.keys(providers).sort().map(name => [name, counts[name] || 0, providers[name]]);
+            const lines = [headers.join(',')].concat(rows.map(row => row.map(v => {
+                if (v === null || v === undefined) return '';
+                const s = v.toString();
+                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            }).join(',')));
+            // Append totals line
+            const totalOrders = typeof lastSummary.count === 'number' ? lastSummary.count : Object.values(counts).reduce((a,b)=>a+(b||0),0);
+            const totalAmount = lastSummary.total_amount || '0.00';
+            lines.push(['Total', totalOrders, totalAmount].map(v => {
+                if (v === null || v === undefined) return '';
+                const s = v.toString();
+                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            }).join(','));
+            const csvContent = '\ufeff' + lines.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const start = document.getElementById('payStartDate').value || 'all';
+            const end = document.getElementById('payEndDate').value || 'all';
+            const filename = `payment-methods_${start}_to_${end}.csv`;
+            // IE/Edge legacy
+            if (window.navigator && window.navigator.msSaveOrOpenBlob) {
+                window.navigator.msSaveOrOpenBlob(blob, filename);
+                return;
+            }
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 0);
+            // Fallback for very old browsers
+            if (!('download' in HTMLAnchorElement.prototype)) {
+                const dataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+                window.open(dataUrl);
+            }
+        }
+
+        let lastSummary = { by_provider: {}, by_provider_counts: {} };
+        function fetchPaymentReport() {
+            const start = document.getElementById('payStartDate').value;
+            const end = document.getElementById('payEndDate').value;
+            let url = 'api/payment-report.php';
+            const params = [];
+            if (start) params.push('start_date=' + encodeURIComponent(start));
+            if (end) params.push('end_date=' + encodeURIComponent(end));
+            if (params.length) url += '?' + params.join('&');
+
+            const tbody = document.getElementById('paymentMethodSummaryBody');
+            tbody.innerHTML = '<tr><td colspan="3" class="loading">Loading...</td></tr>';
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status !== 'success') throw new Error(res.message || 'Failed');
+                    lastSummary = res.summary || { by_provider: {}, by_provider_counts: {} };
+                    document.getElementById('paymentCount').textContent = (res.count || 0) + ' Payments';
+                    renderPaymentMethodSummary(lastSummary);
+                })
+                .catch(err => {
+                    tbody.innerHTML = '<tr><td colspan="3" class="error">Failed to load</td></tr>';
+                    console.error(err);
+                });
+        }
+
+        function renderPaymentMethodSummary(summary) {
+            const tbody = document.getElementById('paymentMethodSummaryBody');
+            const providers = summary.by_provider || {};
+            const counts = summary.by_provider_counts || {};
+            const rows = Object.keys(providers).sort().map(name => {
+                const amount = providers[name];
+                const count = counts[name] || 0;
+                return `<tr><td>${name}</td><td>${count}</td><td>EGP ${amount}</td></tr>`;
+            });
+            const totalOrders = typeof summary.count === 'number' ? summary.count : Object.values(counts).reduce((a,b)=>a+(b||0),0);
+            const totalAmount = summary.total_amount || '0.00';
+            rows.push(`<tr class="total-row"><td><strong>Total</strong></td><td><strong>${totalOrders}</strong></td><td><strong>EGP ${totalAmount}</strong></td></tr>`);
+            tbody.innerHTML = rows.join('');
+        }
+
+        function renderPaymentSummaryRows(summary) { /* deprecated */ }
+
+        document.getElementById('openProductSales').addEventListener('click', function(){
+            showProductSales();
+            fetchProductSales();
+        });
+        document.getElementById('openRegionSales').addEventListener('click', function(){
+            showRegionSales();
+            fetchRegionSales();
+        });
+        document.getElementById('openPaymentReport').addEventListener('click', function(){
+            showPaymentReport();
+            fetchPaymentReport();
+        });
+        document.getElementById('backToBoard').addEventListener('click', function(){
+            showBoard();
+        });
+        document.getElementById('backToBoard2').addEventListener('click', function(){
+            showBoard();
+        });
+        document.getElementById('backToBoard3').addEventListener('click', function(){
+            showBoard();
+        });
+
+        document.getElementById('applyFilters').addEventListener('click', fetchProductSales);
+        document.getElementById('clearFilters').addEventListener('click', function(){
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            fetchProductSales();
+        });
+        document.getElementById('exportCsv').addEventListener('click', exportCsv);
+        document.getElementById('applyRegionFilters').addEventListener('click', fetchRegionSales);
+        document.getElementById('clearRegionFilters').addEventListener('click', function(){
+            document.getElementById('regionStartDate').value = '';
+            document.getElementById('regionEndDate').value = '';
+            fetchRegionSales();
+        });
+        document.getElementById('applyPayFilters').addEventListener('click', fetchPaymentReport);
+        document.getElementById('clearPayFilters').addEventListener('click', function(){
+            document.getElementById('payStartDate').value = '';
+            document.getElementById('payEndDate').value = '';
+            fetchPaymentReport();
+        });
+        document.getElementById('exportPayCsv').addEventListener('click', exportPayCsv);
+
+        attachSortHandlers();
+        setSortIndicators();
+
+        // Start on board view
+        showBoard();
+    });
+    </script>
+</body>
+</html>
+
+

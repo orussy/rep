@@ -26,7 +26,7 @@
             <li class="sidebar-item">
                 <a href="#" class="reports-toggle" data-submenu="reports1">Reports <i class="arrow-icon">▼</i></a>
                 <ul class="submenu" id="reports1">
-                    <li><a href="#">Sales Report</a></li>
+                    <li><a href="sales-report.html">Sales Report</a></li>
                     <li><a href="#">Inventory Report</a></li>
                     <li><a href="#">Business Report</a></li>
                     <li><a href="#">Analytics Report</a></li>
@@ -158,8 +158,10 @@
                             <th>User Name</th>
                             <th>Items (Count)</th>
                             <th class="sortable-header" onclick="sortTable('total')" data-sort="total">Total ↕</th>
+                            <th class="sortable-header" onclick="sortTable('discount_amount')" data-sort="discount_amount">Discount ↕</th>
                             <th class="sortable-header" onclick="sortTable('tax_amount')" data-sort="tax_amount">Tax Amount ↕</th>
                             <th>Tax Rate</th>
+                            <th class="sortable-header" onclick="sortTable('provider')" data-sort="provider">Pyment Method ↕</th>
                             <th class="sortable-header" onclick="sortTable('status')" data-sort="status">Status ↕</th>
                             <th class="sortable-header" onclick="sortTable('created_at')" data-sort="created_at">Date ↕</th>
                         </tr>
@@ -182,17 +184,23 @@
                          <td>
                              <div class="order-details">
                                  <strong>${order.total_items || 0} items</strong><br>
-                                 ${order.order_items || 'No items'}
+                                 
                              </div>
                          </td>
                          <td>
                              <div class="total-amount">${order.total} EGP</div>
                          </td>
                          <td>
+                             <div>-${order.discount_amount || '0.00'} EGP</div>
+                         </td>
+                         <td>
                              <div>${order.tax_amount || '0.00'} EGP</div>
                          </td>
                          <td>
                              <div>${order.tax_rate || '0'}%</div>
+                         </td>
+                         <td>
+                             <div>${order.provider || 'N/A'}</div>
                          </td>
                          <td>
                              <span class="status-badge ${getStatusBadgeClass(order.status)}">

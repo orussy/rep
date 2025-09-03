@@ -15,7 +15,7 @@ try {
     $sortOrder = isset($_GET['sort_order']) ? $_GET['sort_order'] : 'DESC';
     
     // Validate sort parameters
-    $allowedSortFields = ['id', 'user_id', 'total', 'status', 'created_at', 'f_name', 'l_name'];
+    $allowedSortFields = ['id', 'user_id', 'total', 'status', 'created_at', 'f_name', 'l_name', 'discount_amount', 'provider'];
     if (!in_array($sortBy, $allowedSortFields)) {
         $sortBy = 'created_at';
     }
@@ -67,6 +67,28 @@ try {
                 o.updated_at,
                 u.f_name,
                 u.l_name,
+                (
+                  SELECT p.provider FROM payment_details p 
+                  WHERE p.order_id = o.id 
+                  ORDER BY p.created_at DESC LIMIT 1
+                ) as provider,
+                (
+                  SELECT 
+                    COALESCE(SUM(
+                      CASE 
+                        WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
+                        WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
+                        ELSE 0
+                      END
+                    ), 0)
+                  FROM order_item oi
+                  LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                  LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                    AND d.is_active = 1
+                    AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
+                    AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
+                  WHERE oi.order_id = o.id
+                ) AS discount_amount,
                 GROUP_CONCAT(
                     CONCAT(
                         p.name, ' (Qty: ', oi.quantity, ')'
@@ -103,6 +125,12 @@ try {
         
         // Format total as currency
         $row['total'] = number_format($row['total'], 2);
+        // Format discount amount as currency
+        if (isset($row['discount_amount'])) {
+            $row['discount_amount'] = number_format((float)$row['discount_amount'], 2);
+        } else {
+            $row['discount_amount'] = number_format(0, 2);
+        }
         
         $orders[] = $row;
     }
