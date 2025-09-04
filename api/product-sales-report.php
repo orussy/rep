@@ -50,21 +50,23 @@ try {
         SELECT
             p.id AS product_id,
             p.name AS product_name,
-            COALESCE(c.name, sc.name) AS category_name,
+            COALESCE(cat.name, sc.name) AS category_name,
             COUNT(DISTINCT CASE WHEN o.status <> 'canceled' THEN o.id END) AS total_orders,
             COALESCE(SUM(oi.quantity), 0) AS units_sold,
-            COALESCE(SUM(oi.quantity * COALESCE(ps.price, 0)), 0) AS total_revenue,
+            COALESCE(SUM(oi.quantity * COALESCE(COALESCE(psm.price, psa.price), 0)), 0) AS total_revenue,
             CASE WHEN COALESCE(SUM(oi.quantity), 0) > 0
-                 THEN ROUND(COALESCE(SUM(oi.quantity * COALESCE(ps.price, 0)), 0) / SUM(oi.quantity), 2)
+                 THEN ROUND(COALESCE(SUM(oi.quantity * COALESCE(COALESCE(psm.price, psa.price), 0)), 0) / SUM(oi.quantity), 2)
                  ELSE 0 END AS avg_selling_price,
             0 AS returns_count,
             MAX(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) AS last_sold_date
         FROM products p
-        LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN sub_categories sc ON p.category_id = sc.id
+        LEFT JOIN categories cat ON sc.parent_id = cat.id
         LEFT JOIN order_item oi ON oi.product_id = p.id
         LEFT JOIN order_details o ON oi.order_id = o.id AND o.status <> 'canceled'
-        LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+        -- Prefer price when SKU's product matches the order item product; fallback to SKU by ID
+        LEFT JOIN product_skus psm ON oi.product_sku_id = psm.id AND psm.product_id = oi.product_id
+        LEFT JOIN product_skus psa ON oi.product_sku_id = psa.id
         $whereSql
         GROUP BY p.id, p.name, category_name
         ORDER BY total_revenue DESC
@@ -106,7 +108,7 @@ try {
         if ($categoryId) { $retWhere[] = "p.category_id = ?"; $retParams[] = $categoryId; $retTypes .= 'i'; }
         $retWhereSql = 'WHERE ' . implode(' AND ', $retWhere) . " AND oi.product_id IN ($inPlaceholders)";
 
-        $retQuery = "SELECT oi.product_id, COUNT(DISTINCT o.id) AS canceled_orders
+        $retQuery = "SELECT oi.product_id, COALESCE(SUM(oi.quantity), 0) AS canceled_units
                      FROM order_item oi
                      JOIN order_details o ON oi.order_id = o.id
                      JOIN products p ON oi.product_id = p.id
@@ -118,7 +120,7 @@ try {
         $retRes = $retStmt->get_result();
         $productIdToReturns = [];
         while ($r = $retRes->fetch_assoc()) {
-            $productIdToReturns[(int)$r['product_id']] = (int)$r['canceled_orders'];
+            $productIdToReturns[(int)$r['product_id']] = (int)$r['canceled_units'];
         }
         // Merge into rows
         foreach ($rows as &$rrow) {

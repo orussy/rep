@@ -57,11 +57,11 @@ try {
         $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
     }
     
-    // Add condition to exclude admin users
+    // Restrict to customers role only: role_id = 7
     if (!empty($whereConditions)) {
-        $whereConditions[] = "(u.role != 'admin' OR u.role IS NULL)";
+        $whereConditions[] = "u.role_id = 7";
     } else {
-        $whereConditions[] = "(u.role != 'admin' OR u.role IS NULL)";
+        $whereConditions[] = "u.role_id = 7";
     }
     
     $whereClause = '';

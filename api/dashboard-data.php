@@ -76,7 +76,7 @@ try {
                         created_at as full_timestamp,
                         DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) as order_date
                     FROM order_details 
-                    WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ? AND status = 'completed'
+                    WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ? AND status IN ('completed','shipped','delivered')
                     GROUP BY HOUR(CONVERT_TZ(created_at, '+00:00', '+03:00'))
                     ORDER BY hour";
     
@@ -176,7 +176,7 @@ try {
     $stmt->execute();
     $totalOrders = $stmt->get_result()->fetch_assoc()['total'];
     
-    $totalSalesQuery = "SELECT SUM(total) as total FROM order_details WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ? AND status = 'completed'";
+    $totalSalesQuery = "SELECT SUM(total) as total FROM order_details WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ? AND status IN ('completed','shipped','delivered')";
     $stmt = $conn->prepare($totalSalesQuery);
     $stmt->bind_param("s", $currentDate);
     $stmt->execute();

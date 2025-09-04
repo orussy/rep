@@ -1,18 +1,15 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
-// Database connection
-$host = 'localhost';
-$dbname = 'store';
-$username = 'root';
-$password = '';
-
+require_once '../config/db.php';
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo = new PDO('mysql:host=' . DB_SERVER . ';dbname=' . DB_NAME, DB_USERNAME, DB_PASSWORD);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->exec("SET NAMES utf8mb4");
 } catch(PDOException $e) {
     echo json_encode([
         'status' => 'error',
@@ -22,9 +19,7 @@ try {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Get JSON input
     $input = json_decode(file_get_contents('php://input'), true);
-    
     if (!$input) {
         echo json_encode([
             'status' => 'error',
@@ -32,10 +27,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         exit;
     }
-    
+
     $customerId = $input['customer_id'] ?? null;
     $newStatus = $input['status'] ?? null;
-    
+
     if (!$customerId || !$newStatus) {
         echo json_encode([
             'status' => 'error',
@@ -43,33 +38,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         exit;
     }
-    
-    // Validate status
-    $validStatuses = ['active', 'inactive', 'pending', 'suspended'];
-    if (!in_array(strtolower($newStatus), $validStatuses)) {
+
+    $newStatus = strtolower(trim($newStatus));
+    $validStatuses = ['active', 'blocked'];
+    if (!in_array($newStatus, $validStatuses)) {
         echo json_encode([
             'status' => 'error',
             'message' => 'Invalid status. Must be one of: ' . implode(', ', $validStatuses)
         ]);
         exit;
     }
-    
+
     try {
-        // Update customer status
-        $stmt = $pdo->prepare("
-            UPDATE users 
-            SET status = ?
-            WHERE id = ?
-        ");
+        $stmt = $pdo->prepare("UPDATE users SET status = ?, updated_at = NOW() WHERE id = ?");
         $result = $stmt->execute([$newStatus, $customerId]);
-        
+
         if ($result && $stmt->rowCount() > 0) {
-            // Log the activity (we'll skip this for now since there's no activity log table)
-            // The status update succeeded
-            
             echo json_encode([
                 'status' => 'success',
-                'message' => 'Customer status updated successfully'
+                'message' => 'Customer status updated successfully',
+                'new_status' => $newStatus
             ]);
         } else {
             echo json_encode([
@@ -77,7 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'message' => 'Customer not found or no changes made'
             ]);
         }
-        
     } catch (PDOException $e) {
         echo json_encode([
             'status' => 'error',

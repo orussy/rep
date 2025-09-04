@@ -100,7 +100,7 @@
             switch(status.toLowerCase()) {
                 case 'active':
                     return 'status-active';
-                case 'inactive':
+                case 'blocked':
                     return 'status-inactive';
                 case 'pending':
                     return 'status-pending';
@@ -196,16 +196,10 @@
                             </div>
                             
                             <div class="customer-actions">
-                                <button class="action-btn btn-edit" onclick="editCustomer(${customer.id})">
-                                    Edit Customer
-                                </button>
-                                ${customer.status === 'Active' ? 
-                                    `<button class="action-btn btn-deactivate" onclick="toggleCustomerStatus(${customer.id}, 'inactive')">
-                                        Deactivate
-                                    </button>` :
-                                    `<button class="action-btn btn-activate" onclick="toggleCustomerStatus(${customer.id}, 'active')">
-                                        Activate
-                                    </button>`
+                                
+                                ${String(customer.status).toLowerCase() === 'active' ? 
+                                    `<button class=\"action-btn btn-deactivate\" onclick=\"toggleCustomerStatus(${customer.id}, 'blocked')\">Block</button>` :
+                                    `<button class=\"action-btn btn-activate\" onclick=\"toggleCustomerStatus(${customer.id}, 'active')\">Activate</button>`
                                 }
                             </div>
                         </div>
@@ -288,6 +282,9 @@
                             <div class="meta-item">
                                 <span class="meta-label">Last Updated</span>
                                 <span class="meta-value">${customer.updated_at ? formatDate(customer.updated_at) : 'N/A'}</span>
+                            </div>
+                            <div style="margin-top:16px;">
+                                <button class="action-btn btn-edit" onclick="openEditModal(${customer.id})">Edit Profile</button>
                             </div>
                         </div>
                     </div>
@@ -505,6 +502,58 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadCustomerDetails();
         });
+    </script>
+    <script>
+    function openEditModal(id){
+        const c = currentCustomer || {};
+        const formHtml = `
+        <div id="editModal" class="modal" style="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;">
+          <div class="modal-content" style="background:#fff;padding:16px;border-radius:8px;max-width:520px;width:100%;">
+            <h3 style="margin-top:0;">Edit Customer</h3>
+            <div class="form-row"><label>First Name</label><input id="ef_name" value="${c.f_name||''}"></div>
+            <div class="form-row"><label>Last Name</label><input id="el_name" value="${c.l_name||''}"></div>
+            <div class="form-row"><label>Email</label><input id="eemail" value="${c.email||''}"></div>
+            <div class="form-row"><label>Phone</label><input id="ephone" value="${c.phone_no||''}"></div>
+            <div class="form-row"><label>Gender</label><input id="egender" value="${c.gender||''}"></div>
+            <div class="form-row"><label>Birthdate</label><input id="ebirth" value="${c.dob||''}"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                <button onclick="closeEditModal()">Cancel</button>
+                <button onclick="submitEdit(${id})">Save</button>
+            </div>
+          </div>
+        </div>`;
+        const wrap = document.createElement('div');
+        wrap.innerHTML = formHtml;
+        document.body.appendChild(wrap.firstElementChild);
+    }
+    function closeEditModal(){
+        const m = document.getElementById('editModal');
+        if (m) m.remove();
+    }
+    async function submitEdit(id){
+        const payload = {
+            id,
+            f_name: document.getElementById('ef_name').value.trim(),
+            l_name: document.getElementById('el_name').value.trim(),
+            email: document.getElementById('eemail').value.trim(),
+            phone_no: document.getElementById('ephone').value.trim(),
+            gender: document.getElementById('egender').value.trim(),
+            birthdate: document.getElementById('ebirth').value.trim()
+        };
+        try{
+            const res = await fetch('api/update-customer.php',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const out = await res.json();
+            if(out.status !== 'success') throw new Error(out.message||'Failed');
+            closeEditModal();
+            loadCustomerDetails();
+        }catch(e){
+            alert('Update failed: '+ e.message);
+        }
+    }
     </script>
     
     <script src="script.js"></script>

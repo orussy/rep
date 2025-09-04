@@ -83,6 +83,12 @@
                     </div>
                     <p class="date-time">Payments by date, provider, and status</p>
                 </div>
+                <div class="card clickable-row" id="openPromoReport" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3>Promo Code Performance</h3>
+                    </div>
+                    <p class="date-time">Discount codes usage and effectiveness</p>
+                </div>
                 <div class="card" style="opacity:.6;">
                     <div class="card-header">
                         <h3>Top Performers</h3>
@@ -128,7 +134,7 @@
                         <th class="sortable-header" data-key="units_sold">Units Sold</th>
                         <th class="sortable-header" data-key="total_revenue">Total Revenue</th>
                         <th class="sortable-header" data-key="avg_selling_price">Avg. Selling Price</th>
-                        <th class="sortable-header" data-key="returns">Returns</th>
+                        <th class="sortable-header" data-key="returns">Cancelled</th>
                         <th class="sortable-header" data-key="last_sold_date">Last Sold Date</th>
                     </tr>
                 </thead>
@@ -204,6 +210,47 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Promo Code Performance section -->
+        <div class="customers-container" id="promoReportSection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Promo Code Performance</h2>
+                <div>
+                    <button id="backToBoard4" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="promoCount">0 Promo Codes</span>
+                </div>
+            </div>
+            <div class="date-filters">
+                <div class="filter-group">
+                    <label for="promoStartDate">Start Date:</label>
+                    <input type="date" id="promoStartDate" value="">
+                </div>
+                <div class="filter-group">
+                    <label for="promoEndDate">End Date:</label>
+                    <input type="date" id="promoEndDate" value="">
+                </div>
+                <button id="fetchPromoReport" class="filter-btn">Apply Filters</button>
+                <button id="exportPromoCsv" class="export-btn">Export CSV</button>
+            </div>
+            <table class="customers-table" id="promoTable">
+                <thead>
+                    <tr>
+                        <th class="sortable-header" onclick="sortPromoTable('promo_code')" data-sort="promo_code">Promo Code ↕</th>
+                        <th class="sortable-header" onclick="sortPromoTable('promo_name')" data-sort="promo_name">Name ↕</th>
+                        <th class="sortable-header" onclick="sortPromoTable('discount_type')" data-sort="discount_type">Type ↕</th>
+                        <th class="sortable-header" onclick="sortPromoTable('discount_value')" data-sort="discount_value">Value ↕</th>
+                        <th class="sortable-header" onclick="sortPromoTable('orders_count')" data-sort="orders_count">Orders ↕</th>
+                        <th class="sortable-header" onclick="sortPromoTable('total_discount_amount')" data-sort="total_discount_amount">Total Discount ↕</th>
+                        <th class="sortable-header" onclick="sortPromoTable('total_order_value')" data-sort="total_order_value">Order Value ↕</th>
+                        <th class="sortable-header" onclick="sortPromoTable('usage_percentage')" data-sort="usage_percentage">Usage % ↕</th>
+                        <th class="sortable-header" onclick="sortPromoTable('discount_percentage')" data-sort="discount_percentage">Discount % ↕</th>
+                    </tr>
+                </thead>
+                <tbody id="promoTableBody">
+                    <tr><td colspan="9" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -214,12 +261,14 @@
         const productSection = document.getElementById('productSalesSection');
         const regionSection = document.getElementById('regionSalesSection');
         const paymentSection = document.getElementById('paymentReportSection');
+        const promoSection = document.getElementById('promoReportSection');
 
         function showBoard() {
             board.style.display = '';
             productSection.style.display = 'none';
             regionSection.style.display = 'none';
             paymentSection.style.display = 'none';
+            promoSection.style.display = 'none';
         }
         function showProductSales() {
             board.style.display = 'none';
@@ -228,6 +277,10 @@
         function showRegionSales() {
             board.style.display = 'none';
             regionSection.style.display = '';
+        }
+        function showPromoReport() {
+            board.style.display = 'none';
+            promoSection.style.display = '';
         }
         function fetchRegionSales() {
             const start = document.getElementById('regionStartDate').value;
@@ -441,6 +494,24 @@
         }
         function setPaySortIndicators() {}
 
+        function attachProductSortHandlers() {
+            const headers = document.querySelectorAll('#productSalesTable thead th.sortable-header');
+            headers.forEach(h => {
+                h.addEventListener('click', () => {
+                    const key = h.getAttribute('data-key');
+                    if (!key) return;
+                    if (sortState.key === key) {
+                        sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        sortState.key = key;
+                        sortState.direction = 'asc';
+                    }
+                    setSortIndicators();
+                    renderTable();
+                });
+            });
+        }
+
         function renderPayTable() {}
 
         function exportPayCsv() {
@@ -531,9 +602,127 @@
 
         function renderPaymentSummaryRows(summary) { /* deprecated */ }
 
+        let lastPromoData = [];
+        function fetchPromoReport() {
+            const start = document.getElementById('promoStartDate').value;
+            const end = document.getElementById('promoEndDate').value;
+            let url = 'api/promo-code-report.php';
+            const params = [];
+            if (start) params.push('start_date=' + encodeURIComponent(start));
+            if (end) params.push('end_date=' + encodeURIComponent(end));
+            if (params.length) url += '?' + params.join('&');
+
+            const tbody = document.getElementById('promoTableBody');
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    if (!res.success) throw new Error(res.error || 'Failed');
+                    lastPromoData = res.data || [];
+                    document.getElementById('promoCount').textContent = (res.summary?.total_promo_codes || 0) + ' Promo Codes';
+                    renderPromoTable(lastPromoData);
+                })
+                .catch(err => {
+                    tbody.innerHTML = '<tr><td colspan="9" class="error">Failed to load</td></tr>';
+                    console.error(err);
+                });
+        }
+
+        function renderPromoTable(data) {
+            const tbody = document.getElementById('promoTableBody');
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="no-data">No promo codes found</td></tr>';
+                return;
+            }
+            const rows = data.map(promo => {
+                const discountValue = promo.discount_type === 'percentage' 
+                    ? promo.discount_value + '%' 
+                    : 'EGP ' + promo.discount_value;
+                return `
+                    <tr>
+                        <td>${promo.promo_code || 'N/A'}</td>
+                        <td>${promo.promo_name || 'N/A'}</td>
+                        <td>${promo.discount_type || 'N/A'}</td>
+                        <td>${discountValue}</td>
+                        <td>${promo.orders_count || 0}</td>
+                        <td>EGP ${(promo.total_discount_amount || 0).toFixed(2)}</td>
+                        <td>EGP ${(promo.total_order_value || 0).toFixed(2)}</td>
+                        <td>${promo.usage_percentage || 0}%</td>
+                        <td>${promo.discount_percentage || 0}%</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows.join('');
+        }
+
+        function sortPromoTable(column) {
+            if (!lastPromoData || lastPromoData.length === 0) return;
+            
+            const isNumeric = ['orders_count', 'total_discount_amount', 'total_order_value', 'usage_percentage', 'discount_percentage', 'discount_value'].includes(column);
+            lastPromoData.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+                
+                if (isNumeric) {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                    return bVal - aVal; // Descending for numeric
+                } else {
+                    aVal = (aVal || '').toString().toLowerCase();
+                    bVal = (bVal || '').toString().toLowerCase();
+                    return aVal.localeCompare(bVal); // Ascending for text
+                }
+            });
+            renderPromoTable(lastPromoData);
+        }
+
+        function exportPromoCsv() {
+            if (!lastPromoData || lastPromoData.length === 0) {
+                alert('No data to export');
+                return;
+            }
+            const headers = ['Promo Code','Name','Type','Value','Orders','Total Discount','Order Value','Usage %','Discount %'];
+            const rows = lastPromoData.map(promo => {
+                const discountValue = promo.discount_type === 'percentage' 
+                    ? promo.discount_value + '%' 
+                    : 'EGP ' + promo.discount_value;
+                return [
+                    promo.promo_code || 'N/A',
+                    promo.promo_name || 'N/A',
+                    promo.discount_type || 'N/A',
+                    discountValue,
+                    promo.orders_count || 0,
+                    (promo.total_discount_amount || 0).toFixed(2),
+                    (promo.total_order_value || 0).toFixed(2),
+                    (promo.usage_percentage || 0) + '%',
+                    (promo.discount_percentage || 0) + '%'
+                ];
+            });
+            const lines = [headers.join(',')].concat(rows.map(row => row.map(v => {
+                if (v === null || v === undefined) return '';
+                const s = v.toString();
+                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            }).join(',')));
+            const csv = lines.join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'promo-code-report.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else if (navigator.msSaveOrOpenBlob) {
+                navigator.msSaveOrOpenBlob(blob, 'promo-code-report.csv');
+            }
+        }
+
         document.getElementById('openProductSales').addEventListener('click', function(){
             showProductSales();
             fetchProductSales();
+            attachProductSortHandlers();
         });
         document.getElementById('openRegionSales').addEventListener('click', function(){
             showRegionSales();
@@ -543,6 +732,10 @@
             showPaymentReport();
             fetchPaymentReport();
         });
+        document.getElementById('openPromoReport').addEventListener('click', function(){
+            showPromoReport();
+            fetchPromoReport();
+        });
         document.getElementById('backToBoard').addEventListener('click', function(){
             showBoard();
         });
@@ -550,6 +743,9 @@
             showBoard();
         });
         document.getElementById('backToBoard3').addEventListener('click', function(){
+            showBoard();
+        });
+        document.getElementById('backToBoard4').addEventListener('click', function(){
             showBoard();
         });
 
@@ -573,12 +769,19 @@
             fetchPaymentReport();
         });
         document.getElementById('exportPayCsv').addEventListener('click', exportPayCsv);
+        document.getElementById('fetchPromoReport').addEventListener('click', fetchPromoReport);
+        document.getElementById('exportPromoCsv').addEventListener('click', exportPromoCsv);
 
-        attachSortHandlers();
-        setSortIndicators();
+        // Set default dates for promo report
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        document.getElementById('promoStartDate').value = firstDay.toISOString().split('T')[0];
+        document.getElementById('promoEndDate').value = today.toISOString().split('T')[0];
 
         // Start on board view
         showBoard();
+        // Prepare sort handlers in case the section is already visible
+        attachProductSortHandlers();
     });
     </script>
 </body>

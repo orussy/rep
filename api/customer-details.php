@@ -4,16 +4,13 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
 
-// Database connection
-$host = 'localhost';
-$dbname = 'store';
-$username = 'root';
-$password = '';
-
+require_once '../config/db.php';
+// Reuse mysqli connection, but this file uses PDO. Create PDO from constants for consistency.
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo = new PDO('mysql:host=' . DB_SERVER . ';dbname=' . DB_NAME, DB_USERNAME, DB_PASSWORD);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
+    $pdo->exec("SET NAMES utf8mb4");
+} catch (PDOException $e) {
     echo json_encode([
         'status' => 'error',
         'message' => 'Database connection failed: ' . $e->getMessage()
@@ -67,14 +64,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 COALESCE(AVG(total), 0) as avg_order_value,
                 MAX(created_at) as last_order_date
             FROM order_details 
-            WHERE user_id = ? AND status != 'canceled'
+            WHERE user_id = ? AND status IN ('completed','shipped','delivered')
         ");
         $stmt->execute([$customerId]);
         $orderStats = $stmt->fetch(PDO::FETCH_ASSOC);
         
         // Calculate days since last order
         $daysSinceLastOrder = null;
-        if ($orderStats['last_order_date']) {
+        if (!empty($orderStats['last_order_date'])) {
             $lastOrderDate = new DateTime($orderStats['last_order_date']);
             $now = new DateTime();
             $daysSinceLastOrder = $now->diff($lastOrderDate)->days;
