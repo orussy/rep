@@ -30,11 +30,16 @@ async function fetchDashboardData(date = null) {
 function updateDashboard(data) {
     // Update summary numbers
     document.getElementById('ordersCount').textContent = 'Total Orders: ' + formatNumber(data.orders.total);
-    document.getElementById('salesAmount').textContent = 'EGP ' + formatNumber(data.sales.total);
-    document.getElementById('paymentsAmount').textContent = 'EGP ' + formatNumber(data.payments.total);
+    document.getElementById('salesAmount').textContent = 'EGP ' + formatCurrencyNumber(data.sales.total);
+    document.getElementById('paymentsAmount').textContent = 'EGP ' + formatCurrencyNumber(data.payments.total);
+    if (data.discounts && typeof data.discounts.total !== 'undefined') {
+        const el = document.getElementById('discountsAmount');
+        if (el) el.textContent = 'EGP ' + formatCurrencyNumber(data.discounts.total);
+    }
     
     // Update charts
     updateCharts(data);
+    updateTopPerformers(data.topPerformers);
     
     // Log the data for debugging
     console.log('Dashboard data updated for date:', data.date, data);
@@ -56,7 +61,21 @@ function updateCharts(data) {
 // Function to format numbers with commas
 function formatNumber(num) {
     if (num === null || num === undefined) return '0';
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const n = Number(num);
+    if (!isFinite(n)) return '0';
+    const parts = Math.trunc(n).toString().split('');
+    return parts.reverse().join('').replace(/(\d{3})(?=\d)/g, '$1,').split('').reverse().join('');
+}
+
+// Format to 2 decimals and add thousands separators only to integer part
+function formatCurrencyNumber(num) {
+    if (num === null || num === undefined) return '0.00';
+    const n = Number(num);
+    if (!isFinite(n)) return '0.00';
+    const fixed = n.toFixed(2);
+    const [intPart, decPart] = fixed.split('.');
+    const intWithCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return intWithCommas + '.' + decPart;
 }
 
 // Function to create chart
@@ -158,6 +177,54 @@ function createChart(ctx, data, label, color = "purple", timeLabels = null) {
             }
         }
     });
+}
+
+// Render pie charts for top performers
+function updateTopPerformers(topPerformers) {
+    if (!topPerformers) return;
+    const palettes = [
+        '#4dc9f6', '#f67019', '#f53794', '#537bc4', '#acc236',
+        '#166a8f', '#00a950', '#58595b', '#8549ba'
+    ];
+
+    const cfg = (labels, values, title) => ({
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: labels.map((_, i) => palettes[i % palettes.length])
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' },
+                title: { display: false, text: title }
+            }
+        }
+    });
+
+    // Top products
+    const tp = topPerformers.products || [];
+    const tpLabels = tp.map(x => x.label);
+    const tpValues = tp.map(x => Number(x.value || 0));
+    const tpCtx = document.getElementById('topProductsChart');
+    if (tpCtx) new Chart(tpCtx, cfg(tpLabels, tpValues, 'Top Products'));
+
+    // Top categories
+    const tc = topPerformers.categories || [];
+    const tcLabels = tc.map(x => x.label);
+    const tcValues = tc.map(x => Number(x.value || 0));
+    const tcCtx = document.getElementById('topCategoriesChart');
+    if (tcCtx) new Chart(tcCtx, cfg(tcLabels, tcValues, 'Top Categories'));
+
+    // Top customers
+    const tcu = topPerformers.customers || [];
+    const tcuLabels = tcu.map(x => x.label);
+    const tcuValues = tcu.map(x => Number(x.value || 0));
+    const tcuCtx = document.getElementById('topCustomersChart');
+    if (tcuCtx) new Chart(tcuCtx, cfg(tcuLabels, tcuValues, 'Top Customers'));
 }
 
 // Function to handle database connection errors

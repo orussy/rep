@@ -26,6 +26,10 @@ try {
         throw new Exception("Invalid date format. Use YYYY-MM-DD");
     }
 
+    // Normalize to full-day datetime window
+    $startDateTime = $startDate . ' 00:00:00';
+    $endDateTime = $endDate . ' 23:59:59';
+
     // Query to get promo code performance data
     $query = "
         SELECT 
@@ -48,16 +52,24 @@ try {
         LEFT JOIN (
             SELECT 
                 cpc.promocode_id,
-                COUNT(DISTINCT cpc.id) as orders_count,
+                COUNT(DISTINCT od.id) as orders_count,
                 COUNT(DISTINCT cpc.id) as used_count,
                 SUM(CASE 
-                    WHEN pc.discount_type = 'percentage' THEN (c.total * pc.discount_value / 100)
+                    WHEN pc.discount_type = 'percentage' THEN (COALESCE(od.total, c.total) * pc.discount_value / 100)
                     WHEN pc.discount_type = 'fixed' THEN pc.discount_value
                     ELSE 0
                 END) as total_discount_amount,
-                SUM(c.total) as total_order_value,
+                SUM(GREATEST(
+                    COALESCE(od.total, c.total) - 
+                    CASE 
+                        WHEN pc.discount_type = 'percentage' THEN (COALESCE(od.total, c.total) * pc.discount_value / 100)
+                        WHEN pc.discount_type = 'fixed' THEN pc.discount_value
+                        ELSE 0
+                    END, 
+                    0
+                )) as total_order_value,
                 AVG(CASE 
-                    WHEN pc.discount_type = 'percentage' THEN (c.total * pc.discount_value / 100)
+                    WHEN pc.discount_type = 'percentage' THEN (COALESCE(od.total, c.total) * pc.discount_value / 100)
                     WHEN pc.discount_type = 'fixed' THEN pc.discount_value
                     ELSE 0
                 END) as avg_discount_per_order,
@@ -66,6 +78,7 @@ try {
             FROM cart_promocodes cpc
             LEFT JOIN promocodes pc ON cpc.promocode_id = pc.id
             LEFT JOIN cart c ON cpc.cart_id = c.id
+            LEFT JOIN order_details od ON od.cart_id = c.id
             WHERE cpc.applied_at >= ? 
                 AND cpc.applied_at <= ?
             GROUP BY cpc.promocode_id
@@ -75,7 +88,7 @@ try {
     ";
 
     $stmt = $conn->prepare($query);
-    $stmt->bind_param("ss", $startDate, $endDate);
+    $stmt->bind_param("ss", $startDateTime, $endDateTime);
     $stmt->execute();
     $result = $stmt->get_result();
 

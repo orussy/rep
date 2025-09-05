@@ -5,6 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sales Reports - Product Sales</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Promo report filter header styling */
+        #promoReportSection .date-filters {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 12px;
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 12px 0 16px 0;
+        }
+        #promoReportSection .date-filters .filter-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 180px;
+        }
+        #promoReportSection .date-filters label {
+            font-weight: 600;
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 6px;
+        }
+        #promoReportSection .date-filters input[type="date"] {
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            background: #fff;
+        }
+        #promoReportSection .date-filters .filter-btn,
+        #promoReportSection .date-filters .export-btn {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        #promoReportSection .date-filters .filter-btn { background: #2563eb; color: #fff; }
+        #promoReportSection .date-filters .filter-btn:hover { background: #1e4fd6; }
+        #promoReportSection .date-filters .export-btn { background: #10b981; color: #fff; }
+        #promoReportSection .date-filters .export-btn:hover { background: #0e9f75; }
+        @media (max-width: 600px) {
+            #promoReportSection .date-filters { gap: 8px; }
+            #promoReportSection .date-filters .filter-group { min-width: 140px; }
+        }
+        /* Make promo table headers clearly clickable */
+        #promoReportSection #promoTable thead th.sortable-header { cursor: pointer; user-select: none; }
+    </style>
 </head>
 <body>
     <div class="navbar">
@@ -26,6 +76,7 @@
                     <li><a href="sales-report.html">Inventory Report</a></li>
                     <li><a href="#">Business Report</a></li>
                     <li><a href="#">Analytics Report</a></li>
+                    <li><a href="dashboard.html#top-performers">Top Performers</a></li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -89,12 +140,7 @@
                     </div>
                     <p class="date-time">Discount codes usage and effectiveness</p>
                 </div>
-                <div class="card" style="opacity:.6;">
-                    <div class="card-header">
-                        <h3>Top Performers</h3>
-                    </div>
-                    <p class="date-time">Coming soon</p>
-                </div>
+                
             </div>
         </div>
 
@@ -235,15 +281,15 @@
             <table class="customers-table" id="promoTable">
                 <thead>
                     <tr>
-                        <th class="sortable-header" onclick="sortPromoTable('promo_code')" data-sort="promo_code">Promo Code ↕</th>
-                        <th class="sortable-header" onclick="sortPromoTable('promo_name')" data-sort="promo_name">Name ↕</th>
-                        <th class="sortable-header" onclick="sortPromoTable('discount_type')" data-sort="discount_type">Type ↕</th>
-                        <th class="sortable-header" onclick="sortPromoTable('discount_value')" data-sort="discount_value">Value ↕</th>
-                        <th class="sortable-header" onclick="sortPromoTable('orders_count')" data-sort="orders_count">Orders ↕</th>
-                        <th class="sortable-header" onclick="sortPromoTable('total_discount_amount')" data-sort="total_discount_amount">Total Discount ↕</th>
-                        <th class="sortable-header" onclick="sortPromoTable('total_order_value')" data-sort="total_order_value">Order Value ↕</th>
-                        <th class="sortable-header" onclick="sortPromoTable('usage_percentage')" data-sort="usage_percentage">Usage % ↕</th>
-                        <th class="sortable-header" onclick="sortPromoTable('discount_percentage')" data-sort="discount_percentage">Discount % ↕</th>
+                        <th class="sortable-header" data-sort="promo_code">Promo Code ↕</th>
+                        <th class="sortable-header" data-sort="promo_name">Name ↕</th>
+                        <th class="sortable-header" data-sort="discount_type">Type ↕</th>
+                        <th class="sortable-header" data-sort="discount_value">Value ↕</th>
+                        <th class="sortable-header" data-sort="orders_count">Orders ↕</th>
+                        <th class="sortable-header" data-sort="total_discount_amount">Total Discount ↕</th>
+                        <th class="sortable-header" data-sort="total_order_value">Order Value ↕</th>
+                        <th class="sortable-header" data-sort="usage_percentage">Usage % ↕</th>
+                        <th class="sortable-header" data-sort="discount_percentage">Discount % ↕</th>
                     </tr>
                 </thead>
                 <tbody id="promoTableBody">
@@ -655,25 +701,52 @@
             tbody.innerHTML = rows.join('');
         }
 
+        // Promo table sorting state and helpers
+        let promoSortState = { key: null, direction: 'desc' };
+
+        function updatePromoHeaderIndicators() {
+            const headers = document.querySelectorAll('#promoTable thead th.sortable-header');
+            headers.forEach(th => {
+                const key = th.getAttribute('data-sort');
+                const base = th.textContent.replace(/[\s↑↓↕]+$/, '').replace(/[↑↓↕]/g,'').trim();
+                let suffix = ' ↕';
+                if (promoSortState.key === key) {
+                    suffix = promoSortState.direction === 'asc' ? ' ↑' : ' ↓';
+                }
+                th.textContent = base + suffix;
+            });
+        }
+
         function sortPromoTable(column) {
             if (!lastPromoData || lastPromoData.length === 0) return;
-            
-            const isNumeric = ['orders_count', 'total_discount_amount', 'total_order_value', 'usage_percentage', 'discount_percentage', 'discount_value'].includes(column);
+
+            const numericKeys = new Set(['orders_count','total_discount_amount','total_order_value','usage_percentage','discount_percentage','discount_value']);
+            const isNumeric = numericKeys.has(column);
+
+            // Toggle direction if same column; otherwise set default per type
+            if (promoSortState.key === column) {
+                promoSortState.direction = (promoSortState.direction === 'asc') ? 'desc' : 'asc';
+            } else {
+                promoSortState.key = column;
+                promoSortState.direction = isNumeric ? 'desc' : 'asc';
+            }
+
             lastPromoData.sort((a, b) => {
                 let aVal = a[column];
                 let bVal = b[column];
-                
                 if (isNumeric) {
                     aVal = parseFloat(aVal) || 0;
                     bVal = parseFloat(bVal) || 0;
-                    return bVal - aVal; // Descending for numeric
                 } else {
-                    aVal = (aVal || '').toString().toLowerCase();
-                    bVal = (bVal || '').toString().toLowerCase();
-                    return aVal.localeCompare(bVal); // Ascending for text
+                    aVal = (aVal ?? '').toString().toLowerCase();
+                    bVal = (bVal ?? '').toString().toLowerCase();
                 }
+                if (aVal < bVal) return promoSortState.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return promoSortState.direction === 'asc' ? 1 : -1;
+                return 0;
             });
             renderPromoTable(lastPromoData);
+            updatePromoHeaderIndicators();
         }
 
         function exportPromoCsv() {
@@ -770,6 +843,13 @@
         });
         document.getElementById('exportPayCsv').addEventListener('click', exportPayCsv);
         document.getElementById('fetchPromoReport').addEventListener('click', fetchPromoReport);
+        // Attach promo header click handlers after DOM is ready
+        document.querySelectorAll('#promoTable thead th.sortable-header').forEach(th => {
+            th.addEventListener('click', () => {
+                const key = th.getAttribute('data-sort');
+                sortPromoTable(key);
+            });
+        });
         document.getElementById('exportPromoCsv').addEventListener('click', exportPromoCsv);
 
         // Set default dates for promo report

@@ -4,15 +4,14 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
 
-// Database connection
-$host = 'localhost';
-$dbname = 'store';
-$username = 'root';
-$password = '';
-
+// Database connection using shared config
+require_once '../config/db.php';
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $dsn = 'mysql:host=' . DB_SERVER . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+    $pdo = new PDO($dsn, DB_USERNAME, DB_PASSWORD, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
 } catch(PDOException $e) {
     echo json_encode([
         'status' => 'error',
@@ -33,14 +32,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
     
     try {
-        // Get customer orders with item count
+        // Get customer orders with item count and latest payment provider
         $stmt = $pdo->prepare("
             SELECT 
                 o.id,
                 o.created_at,
                 o.status,
                 o.total as total_amount,
-                'N/A' as payment_method,
+                (
+                    SELECT p.provider FROM payment_details p
+                    WHERE p.order_id = o.id
+                    ORDER BY p.created_at DESC
+                    LIMIT 1
+                ) as payment_method,
                 COUNT(oi.id) as items_count
             FROM order_details o
             LEFT JOIN order_item oi ON o.id = oi.order_id

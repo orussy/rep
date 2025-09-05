@@ -73,7 +73,8 @@ try {
                   ORDER BY p.created_at DESC LIMIT 1
                 ) as provider,
                 (
-                  SELECT 
+                  -- Product-level discounts
+                  (SELECT 
                     COALESCE(SUM(
                       CASE 
                         WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
@@ -81,13 +82,27 @@ try {
                         ELSE 0
                       END
                     ), 0)
-                  FROM order_item oi
-                  LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
-                  LEFT JOIN discounts d ON d.product_id = oi.product_id 
-                    AND d.is_active = 1
-                    AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
-                    AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
-                  WHERE oi.order_id = o.id
+                   FROM order_item oi
+                   LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                   LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                     AND d.is_active = 1
+                     AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
+                     AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
+                   WHERE oi.order_id = o.id)
+                  +
+                  -- Promo code discount applied on cart
+                  COALESCE((SELECT 
+                    CASE 
+                      WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
+                      WHEN pc.discount_type = 'fixed' THEN pc.discount_value
+                      ELSE 0
+                    END
+                   FROM cart_promocodes cpc
+                   LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
+                   LEFT JOIN cart c ON c.id = cpc.cart_id
+                   WHERE cpc.cart_id = o.cart_id
+                   ORDER BY cpc.applied_at DESC
+                   LIMIT 1), 0)
                 ) AS discount_amount,
                 GROUP_CONCAT(
                     CONCAT(

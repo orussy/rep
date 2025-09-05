@@ -7,6 +7,12 @@ header('Access-Control-Allow-Headers: Content-Type');
 require_once '../config/db.php';
 
 try {
+    // Initialize DB connection
+    $conn = new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME);
+    if ($conn->connect_error) {
+        throw new Exception('Connection failed: ' . $conn->connect_error);
+    }
+    $conn->set_charset('utf8mb4');
     // Get date from query parameter or use current date as default
     $requestedDate = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
     
@@ -71,13 +77,49 @@ try {
     
     // Fetch sales data for the specified date using proper datetime boundaries
     $salesQuery = "SELECT 
-                        HOUR(CONVERT_TZ(created_at, '+00:00', '+03:00')) as hour,
-                        SUM(total) as total,
-                        created_at as full_timestamp,
-                        DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) as order_date
-                    FROM order_details 
-                    WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ? AND status IN ('completed','shipped','delivered')
-                    GROUP BY HOUR(CONVERT_TZ(created_at, '+00:00', '+03:00'))
+                        HOUR(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) as hour,
+                        SUM(
+                            GREATEST(
+                                (COALESCE(o.total,0) - COALESCE(o.tax_amount,0))
+                                - (
+                                    -- Product-level discounts per order
+                                    (SELECT COALESCE(SUM(
+                                        CASE 
+                                            WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
+                                            WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
+                                            ELSE 0
+                                        END
+                                    ), 0)
+                                     FROM order_item oi
+                                     LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                     LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                                        AND d.is_active = 1
+                                        AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
+                                        AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
+                                     WHERE oi.order_id = o.id)
+                                    +
+                                    -- Promo discount per cart
+                                    COALESCE((SELECT 
+                                        CASE 
+                                            WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
+                                            WHEN pc.discount_type = 'fixed' THEN pc.discount_value
+                                            ELSE 0
+                                        END
+                                       FROM cart_promocodes cpc
+                                       LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
+                                       LEFT JOIN cart c ON c.id = cpc.cart_id
+                                       WHERE cpc.cart_id = o.cart_id
+                                       ORDER BY cpc.applied_at DESC
+                                       LIMIT 1), 0)
+                                ),
+                                0
+                            )
+                        ) as total,
+                        o.created_at as full_timestamp,
+                        DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) as order_date
+                    FROM order_details o
+                    WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')
+                    GROUP BY HOUR(CONVERT_TZ(o.created_at, '+00:00', '+03:00'))
                     ORDER BY hour";
     
     $stmt = $conn->prepare($salesQuery);
@@ -176,7 +218,44 @@ try {
     $stmt->execute();
     $totalOrders = $stmt->get_result()->fetch_assoc()['total'];
     
-    $totalSalesQuery = "SELECT SUM(total) as total FROM order_details WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ? AND status IN ('completed','shipped','delivered')";
+    $totalSalesQuery = "SELECT 
+                            SUM(
+                                GREATEST(
+                                    (COALESCE(o.total,0) - COALESCE(o.tax_amount,0))
+                                    - (
+                                        (SELECT COALESCE(SUM(
+                                            CASE 
+                                                WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
+                                                WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
+                                                ELSE 0
+                                            END
+                                        ), 0)
+                                         FROM order_item oi
+                                         LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                         LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                                            AND d.is_active = 1
+                                            AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
+                                            AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
+                                         WHERE oi.order_id = o.id)
+                                        +
+                                        COALESCE((SELECT 
+                                            CASE 
+                                                WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
+                                                WHEN pc.discount_type = 'fixed' THEN pc.discount_value
+                                                ELSE 0
+                                            END
+                                           FROM cart_promocodes cpc
+                                           LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
+                                           LEFT JOIN cart c ON c.id = cpc.cart_id
+                                           WHERE cpc.cart_id = o.cart_id
+                                           ORDER BY cpc.applied_at DESC
+                                           LIMIT 1), 0)
+                                    ),
+                                    0
+                                )
+                            ) as total
+                        FROM order_details o
+                        WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')";
     $stmt = $conn->prepare($totalSalesQuery);
     $stmt->bind_param("s", $currentDate);
     $stmt->execute();
@@ -193,6 +272,47 @@ try {
     $stmt->execute();
     $totalPaymentsResult = $stmt->get_result();
     $totalPayments = $totalPaymentsResult->fetch_assoc()['total'] ?? 0;
+
+    // Compute total discounts (product-level + promo) for completed/shipped/delivered orders on the date
+    $totalDiscountsQuery = "SELECT 
+                                SUM(
+                                    -- Product-level discounts per order
+                                    (SELECT COALESCE(SUM(
+                                        CASE 
+                                            WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
+                                            WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
+                                            ELSE 0
+                                        END
+                                    ), 0)
+                                     FROM order_item oi
+                                     LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                     LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                                        AND d.is_active = 1
+                                        AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
+                                        AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
+                                     WHERE oi.order_id = o.id)
+                                    +
+                                    -- Promo discount per cart
+                                    COALESCE((SELECT 
+                                        CASE 
+                                            WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
+                                            WHEN pc.discount_type = 'fixed' THEN pc.discount_value
+                                            ELSE 0
+                                        END
+                                       FROM cart_promocodes cpc
+                                       LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
+                                       LEFT JOIN cart c ON c.id = cpc.cart_id
+                                       WHERE cpc.cart_id = o.cart_id
+                                       ORDER BY cpc.applied_at DESC
+                                       LIMIT 1), 0)
+                                ) as total_discounts
+                            FROM order_details o
+                            WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')";
+    $stmt = $conn->prepare($totalDiscountsQuery);
+    $stmt->bind_param("s", $currentDate);
+    $stmt->execute();
+    $totalDiscountsRow = $stmt->get_result()->fetch_assoc();
+    $totalDiscounts = $totalDiscountsRow['total_discounts'] ?? 0;
     
     error_log("Total payments query executed for date: " . $currentDate);
     error_log("Total payments result: " . json_encode($totalPaymentsResult->fetch_assoc()));
@@ -235,6 +355,84 @@ try {
             'total' => (float)$row['total_amount']
         ];
     }
+
+    // Top performers: products (by quantity), categories (by quantity), customers (by total spend)
+    // Products
+    $topProductsQuery = "SELECT p.name as label, SUM(oi.quantity) as value
+                         FROM order_item oi
+                         INNER JOIN order_details o ON o.id = oi.order_id
+                         INNER JOIN products p ON p.id = oi.product_id
+                         WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')
+                         GROUP BY p.name
+                         ORDER BY value DESC
+                         LIMIT 5";
+    $stmt = $conn->prepare($topProductsQuery);
+    $stmt->bind_param("s", $currentDate);
+    $stmt->execute();
+    $tpRes = $stmt->get_result();
+    $topProducts = [];
+    while ($r = $tpRes->fetch_assoc()) { $topProducts[] = $r; }
+
+    // Categories (use sub_categories as product category relation)
+    $topCategoriesQuery = "SELECT sc.name as label, SUM(oi.quantity) as value
+                           FROM order_item oi
+                           INNER JOIN order_details o ON o.id = oi.order_id
+                           INNER JOIN products p ON p.id = oi.product_id
+                           INNER JOIN sub_categories sc ON sc.id = p.category_id
+                           WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')
+                           GROUP BY sc.name
+                           ORDER BY value DESC
+                           LIMIT 5";
+    $stmt = $conn->prepare($topCategoriesQuery);
+    $stmt->bind_param("s", $currentDate);
+    $stmt->execute();
+    $tcRes = $stmt->get_result();
+    $topCategories = [];
+    while ($r = $tcRes->fetch_assoc()) { $topCategories[] = $r; }
+
+    // Customers (by net spend: total - tax - discounts)
+    $topCustomersQuery = "SELECT CONCAT(u.f_name, ' ', u.l_name) as label,
+                                 SUM(GREATEST((COALESCE(o.total,0) - COALESCE(o.tax_amount,0)) - (
+                                     (SELECT COALESCE(SUM(
+                                         CASE 
+                                             WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
+                                             WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
+                                             ELSE 0
+                                         END
+                                     ), 0)
+                                      FROM order_item oi
+                                      LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                      LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                                         AND d.is_active = 1
+                                         AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
+                                         AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
+                                      WHERE oi.order_id = o.id)
+                                      +
+                                      COALESCE((SELECT 
+                                          CASE 
+                                              WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
+                                              WHEN pc.discount_type = 'fixed' THEN pc.discount_value
+                                              ELSE 0
+                                          END
+                                         FROM cart_promocodes cpc
+                                         LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
+                                         LEFT JOIN cart c ON c.id = cpc.cart_id
+                                         WHERE cpc.cart_id = o.cart_id
+                                         ORDER BY cpc.applied_at DESC
+                                         LIMIT 1), 0)
+                                  ), 0)) as value
+                          FROM order_details o
+                          INNER JOIN users u ON u.id = o.user_id
+                          WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')
+                          GROUP BY u.f_name, u.l_name
+                          ORDER BY value DESC
+                          LIMIT 5";
+    $stmt = $conn->prepare($topCustomersQuery);
+    $stmt->bind_param("s", $currentDate);
+    $stmt->execute();
+    $tcuRes = $stmt->get_result();
+    $topCustomers = [];
+    while ($r = $tcuRes->fetch_assoc()) { $topCustomers[] = $r; }
     
     // Format time labels (12-hour format)
     $timeLabels = [];
@@ -283,10 +481,19 @@ try {
                 'hourly' => array_values($hourlyPayments),
                 'total' => $totalPayments
             ],
+            'discounts' => [
+                'total' => $totalDiscounts
+            ],
+            'topPerformers' => [
+                'products' => $topProducts,
+                'categories' => $topCategories,
+                'customers' => $topCustomers
+            ],
             'summary' => [
                 'totalOrders' => $totalOrders,
                 'totalSales' => $totalSales,
                 'totalPayments' => $totalPayments,
+                'totalDiscounts' => $totalDiscounts,
                 'completedOrders' => $orderStats['completed']['count'] ?? 0,
                 'pendingOrders' => $orderStats['pending']['count'] ?? 0,
                 'processingOrders' => $orderStats['processing']['count'] ?? 0
