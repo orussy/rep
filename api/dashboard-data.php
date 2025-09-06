@@ -7,18 +7,20 @@ header('Access-Control-Allow-Headers: Content-Type');
 require_once '../config/db.php';
 
 try {
-    // Initialize DB connection
-    $conn = new mysqli(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME);
-    if ($conn->connect_error) {
-        throw new Exception('Connection failed: ' . $conn->connect_error);
-    }
-    $conn->set_charset('utf8mb4');
+    // Use the existing connection from db.php
+    // The connection is already established in db.php
     // Get date from query parameter or use current date as default
     $requestedDate = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+    $timePeriod = isset($_GET['period']) ? $_GET['period'] : 'day';
     
     // Validate date format
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestedDate)) {
         throw new Exception('Invalid date format. Use YYYY-MM-DD');
+    }
+    
+    // Validate time period
+    if (!in_array($timePeriod, ['day', 'week', 'month'])) {
+        throw new Exception('Invalid time period. Use day, week, or month');
     }
     
     $currentDate = $requestedDate;
@@ -26,10 +28,58 @@ try {
     // Set timezone to match your database timezone (UTC+3)
     date_default_timezone_set('UTC');
     
-    // Create proper date boundaries for the requested date in UTC+3
-    // Since your database is UTC+3, we need to adjust the boundaries
+    // Create proper date boundaries based on time period
+    $baseDate = new DateTime($currentDate);
+    
+    switch ($timePeriod) {
+        case 'day':
     $startDateTime = $currentDate . ' 00:00:00';
     $endDateTime = $currentDate . ' 23:59:59';
+            $dateFormat = 'H'; // Hour for daily view
+            $dateGroupBy = 'HOUR(CONVERT_TZ(o.created_at, \'+00:00\', \'+03:00\'))';
+            $dateFilter = 'DATE(CONVERT_TZ(o.created_at, \'+00:00\', \'+03:00\')) = ?';
+            $paymentDateGroupBy = 'HOUR(CONVERT_TZ(p.created_at, \'+00:00\', \'+03:00\'))';
+            $paymentDateFilter = 'DATE(CONVERT_TZ(p.created_at, \'+00:00\', \'+03:00\')) = ?';
+            $orderDateFilter = 'DATE(CONVERT_TZ(created_at, \'+00:00\', \'+03:00\')) = ?';
+            $dateParam = $currentDate;
+            break;
+            
+        case 'week':
+            // Get start of week (Monday) and end of week (Sunday)
+            $startOfWeek = clone $baseDate;
+            $startOfWeek->modify('monday this week');
+            $endOfWeek = clone $startOfWeek;
+            $endOfWeek->modify('+6 days');
+            
+            $startDateTime = $startOfWeek->format('Y-m-d') . ' 00:00:00';
+            $endDateTime = $endOfWeek->format('Y-m-d') . ' 23:59:59';
+            $dateFormat = 'Y-m-d'; // Date for weekly view
+            $dateGroupBy = 'DATE(CONVERT_TZ(o.created_at, \'+00:00\', \'+03:00\'))';
+            $dateFilter = 'DATE(CONVERT_TZ(o.created_at, \'+00:00\', \'+03:00\')) BETWEEN ? AND ?';
+            $paymentDateGroupBy = 'DATE(CONVERT_TZ(p.created_at, \'+00:00\', \'+03:00\'))';
+            $paymentDateFilter = 'DATE(CONVERT_TZ(p.created_at, \'+00:00\', \'+03:00\')) BETWEEN ? AND ?';
+            $orderDateFilter = 'DATE(CONVERT_TZ(created_at, \'+00:00\', \'+03:00\')) BETWEEN ? AND ?';
+            $dateParam = [$startOfWeek->format('Y-m-d'), $endOfWeek->format('Y-m-d')];
+            break;
+            
+        case 'month':
+            // Get start and end of month
+            $startOfMonth = clone $baseDate;
+            $startOfMonth->modify('first day of this month');
+            $endOfMonth = clone $baseDate;
+            $endOfMonth->modify('last day of this month');
+            
+            $startDateTime = $startOfMonth->format('Y-m-d') . ' 00:00:00';
+            $endDateTime = $endOfMonth->format('Y-m-d') . ' 23:59:59';
+            $dateFormat = 'Y-m-d'; // Date for monthly view
+            $dateGroupBy = 'DATE(CONVERT_TZ(o.created_at, \'+00:00\', \'+03:00\'))';
+            $dateFilter = 'DATE(CONVERT_TZ(o.created_at, \'+00:00\', \'+03:00\')) BETWEEN ? AND ?';
+            $paymentDateGroupBy = 'DATE(CONVERT_TZ(p.created_at, \'+00:00\', \'+03:00\'))';
+            $paymentDateFilter = 'DATE(CONVERT_TZ(p.created_at, \'+00:00\', \'+03:00\')) BETWEEN ? AND ?';
+            $orderDateFilter = 'DATE(CONVERT_TZ(created_at, \'+00:00\', \'+03:00\')) BETWEEN ? AND ?';
+            $dateParam = [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')];
+            break;
+    }
     
     error_log("=== DEBUG START ===");
     error_log("Requested date: " . $currentDate);
@@ -38,46 +88,59 @@ try {
     error_log("Current timezone: " . date_default_timezone_get());
     error_log("Database timezone: UTC+3");
     
-    // Initialize arrays for 24-hour data
+    // Initialize arrays for time period data
+    if ($timePeriod === 'day') {
     $hourlyOrders = array_fill(0, 24, 0);
     $hourlySales = array_fill(0, 24, 0);
     $hourlyPayments = array_fill(0, 24, 0);
+    } else {
+        $hourlyOrders = [];
+        $hourlySales = [];
+        $hourlyPayments = [];
+    }
     
-    // Fetch orders data for the specified date using proper datetime boundaries
-    // Use CONVERT_TZ to ensure we're working in the correct timezone
+    // Fetch orders data for the specified time period
     $ordersQuery = "SELECT 
-                        HOUR(CONVERT_TZ(created_at, '+00:00', '+03:00')) as hour,
+                        " . $dateGroupBy . " as time_period,
                         COUNT(*) as count,
-                        created_at as full_timestamp,
-                        DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) as order_date
-                    FROM order_details 
-                    WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ?
-                    GROUP BY HOUR(CONVERT_TZ(created_at, '+00:00', '+03:00'))
-                    ORDER BY hour";
+                        o.created_at as full_timestamp,
+                        DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) as order_date
+                    FROM order_details o
+                    WHERE " . $dateFilter . "
+                    GROUP BY " . $dateGroupBy . "
+                    ORDER BY time_period";
     
     $stmt = $conn->prepare($ordersQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $ordersResult = $stmt->get_result();
     
     while ($row = $ordersResult->fetch_assoc()) {
-        $hour = (int)$row['hour'];
+        $timePeriodValue = $row['time_period'];
         $count = (int)$row['count'];
         $timestamp = $row['full_timestamp'];
         $orderDate = $row['order_date'];
         
-        // Ensure hour is within valid range
+        if ($timePeriod === 'day') {
+            $hour = (int)$timePeriodValue;
         if ($hour >= 0 && $hour <= 23) {
             $hourlyOrders[$hour] = $count;
+            }
+        } else {
+            $hourlyOrders[$timePeriodValue] = $count;
         }
         
         // Debug logging
-        error_log("Orders: Raw hour: {$row['hour']}, Casted hour: {$hour}, Count: {$count}, Timestamp: {$timestamp}, Date: {$orderDate}");
+        error_log("Orders: Time period: {$timePeriodValue}, Count: {$count}, Timestamp: {$timestamp}, Date: {$orderDate}");
     }
     
-    // Fetch sales data for the specified date using proper datetime boundaries
+    // Fetch sales data for the specified time period
     $salesQuery = "SELECT 
-                        HOUR(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) as hour,
+                        " . $dateGroupBy . " as time_period,
                         SUM(
                             GREATEST(
                                 (COALESCE(o.total,0) - COALESCE(o.tax_amount,0))
@@ -118,33 +181,41 @@ try {
                         o.created_at as full_timestamp,
                         DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) as order_date
                     FROM order_details o
-                    WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')
-                    GROUP BY HOUR(CONVERT_TZ(o.created_at, '+00:00', '+03:00'))
-                    ORDER BY hour";
+                    WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')
+                    GROUP BY " . $dateGroupBy . "
+                    ORDER BY time_period";
     
     $stmt = $conn->prepare($salesQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $salesResult = $stmt->get_result();
     
     while ($row = $salesResult->fetch_assoc()) {
-        $hour = (int)$row['hour'];
+        $timePeriodValue = $row['time_period'];
         $total = (float)$row['total'];
         $timestamp = $row['full_timestamp'];
         $orderDate = $row['order_date'];
         
-        // Ensure hour is within valid range
+        if ($timePeriod === 'day') {
+            $hour = (int)$timePeriodValue;
         if ($hour >= 0 && $hour <= 23) {
             $hourlySales[$hour] = $total;
+            }
+        } else {
+            $hourlySales[$timePeriodValue] = $total;
         }
         
         // Debug logging
-        error_log("Sales: Raw hour: {$row['hour']}, Casted hour: {$hour}, Total: {$total}, Timestamp: {$timestamp}, Date: {$orderDate}");
+        error_log("Sales: Time period: {$timePeriodValue}, Total: {$total}, Timestamp: {$timestamp}, Date: {$orderDate}");
     }
     
-    // Fetch payments data for the specified date using proper datetime boundaries
+    // Fetch payments data for the specified time period
     $paymentsQuery = "SELECT 
-                        HOUR(CONVERT_TZ(p.created_at, '+00:00', '+03:00')) as hour,
+                        " . $paymentDateGroupBy . " as time_period,
                         SUM(p.amount) as total,
                         p.created_at as full_timestamp,
                         DATE(CONVERT_TZ(p.created_at, '+00:00', '+03:00')) as payment_date,
@@ -153,22 +224,26 @@ try {
                         p.amount as individual_amount
                     FROM payment_details p
                     INNER JOIN order_details o ON p.order_id = o.id
-                    WHERE DATE(CONVERT_TZ(p.created_at, '+00:00', '+03:00')) = ? AND p.status = 'completed'
-                    GROUP BY HOUR(CONVERT_TZ(p.created_at, '+00:00', '+03:00'))
-                    ORDER BY hour";
+                    WHERE " . $paymentDateFilter . " AND p.status = 'completed'
+                    GROUP BY " . $paymentDateGroupBy . "
+                    ORDER BY time_period";
     
     $stmt = $conn->prepare($paymentsQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $paymentsResult = $stmt->get_result();
     
     // Debug: Log the payments query and results
     error_log("=== PAYMENTS DEBUG ===");
-    error_log("Payments query executed for date: " . $currentDate);
+    error_log("Payments query executed for time period: " . $timePeriod);
     error_log("Number of payment rows returned: " . $paymentsResult->num_rows);
     
     while ($row = $paymentsResult->fetch_assoc()) {
-        $hour = (int)$row['hour'];
+        $timePeriodValue = $row['time_period'];
         $total = (float)$row['total'];
         $timestamp = $row['full_timestamp'];
         $paymentDate = $row['payment_date'];
@@ -176,13 +251,17 @@ try {
         $orderId = $row['order_id'];
         $individualAmount = $row['individual_amount'];
         
-        // Ensure hour is within valid range
+        if ($timePeriod === 'day') {
+            $hour = (int)$timePeriodValue;
         if ($hour >= 0 && $hour <= 23) {
             $hourlyPayments[$hour] = $total;
+            }
+        } else {
+            $hourlyPayments[$timePeriodValue] = $total;
         }
         
         // Debug logging
-        error_log("Payments: Raw hour: {$row['hour']}, Casted hour: {$hour}, Total: {$total}, Timestamp: {$timestamp}, Date: {$paymentDate}, Status: {$paymentStatus}, Order ID: {$orderId}, Individual Amount: {$individualAmount}");
+        error_log("Payments: Time period: {$timePeriodValue}, Total: {$total}, Timestamp: {$timestamp}, Date: {$paymentDate}, Status: {$paymentStatus}, Order ID: {$orderId}, Individual Amount: {$individualAmount}");
     }
     
     // Debug: Check if there are any payments at all for this date
@@ -212,9 +291,13 @@ try {
     }
     
     // Get total counts and amounts using proper datetime boundaries
-    $totalOrdersQuery = "SELECT COUNT(*) as total FROM order_details WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ?";
+    $totalOrdersQuery = "SELECT COUNT(*) as total FROM order_details o WHERE " . $dateFilter;
     $stmt = $conn->prepare($totalOrdersQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $totalOrders = $stmt->get_result()->fetch_assoc()['total'];
     
@@ -255,9 +338,13 @@ try {
                                 )
                             ) as total
                         FROM order_details o
-                        WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')";
+                        WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')";
     $stmt = $conn->prepare($totalSalesQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $totalSales = $stmt->get_result()->fetch_assoc()['total'] ?? 0;
     
@@ -266,9 +353,13 @@ try {
     
     $totalPaymentsQuery = "SELECT SUM(p.amount) as total FROM payment_details p 
                            INNER JOIN order_details o ON p.order_id = o.id 
-                           WHERE DATE(CONVERT_TZ(p.created_at, '+00:00', '+03:00')) = ? AND p.status = 'completed'";
+                           WHERE " . $paymentDateFilter . " AND p.status = 'completed'";
     $stmt = $conn->prepare($totalPaymentsQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $totalPaymentsResult = $stmt->get_result();
     $totalPayments = $totalPaymentsResult->fetch_assoc()['total'] ?? 0;
@@ -307,9 +398,13 @@ try {
                                        LIMIT 1), 0)
                                 ) as total_discounts
                             FROM order_details o
-                            WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')";
+                            WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')";
     $stmt = $conn->prepare($totalDiscountsQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $totalDiscountsRow = $stmt->get_result()->fetch_assoc();
     $totalDiscounts = $totalDiscountsRow['total_discounts'] ?? 0;
@@ -340,11 +435,15 @@ try {
                             COUNT(*) as count,
                             SUM(total) as total_amount
                         FROM order_details 
-                        WHERE DATE(CONVERT_TZ(created_at, '+00:00', '+03:00')) = ?
+                        WHERE " . $orderDateFilter . "
                         GROUP BY status";
     
     $stmt = $conn->prepare($orderStatsQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $orderStatsResult = $stmt->get_result();
     
@@ -362,12 +461,16 @@ try {
                          FROM order_item oi
                          INNER JOIN order_details o ON o.id = oi.order_id
                          INNER JOIN products p ON p.id = oi.product_id
-                         WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')
+                         WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')
                          GROUP BY p.name
                          ORDER BY value DESC
                          LIMIT 5";
     $stmt = $conn->prepare($topProductsQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $tpRes = $stmt->get_result();
     $topProducts = [];
@@ -379,12 +482,16 @@ try {
                            INNER JOIN order_details o ON o.id = oi.order_id
                            INNER JOIN products p ON p.id = oi.product_id
                            INNER JOIN sub_categories sc ON sc.id = p.category_id
-                           WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')
+                           WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')
                            GROUP BY sc.name
                            ORDER BY value DESC
                            LIMIT 5";
     $stmt = $conn->prepare($topCategoriesQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $tcRes = $stmt->get_result();
     $topCategories = [];
@@ -423,19 +530,142 @@ try {
                                   ), 0)) as value
                           FROM order_details o
                           INNER JOIN users u ON u.id = o.user_id
-                          WHERE DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) = ? AND o.status IN ('completed','shipped','delivered')
+                          WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')
                           GROUP BY u.f_name, u.l_name
                           ORDER BY value DESC
                           LIMIT 5";
     $stmt = $conn->prepare($topCustomersQuery);
-    $stmt->bind_param("s", $currentDate);
+    if (is_array($dateParam)) {
+        $stmt->bind_param("ss", ...$dateParam);
+    } else {
+        $stmt->bind_param("s", $dateParam);
+    }
     $stmt->execute();
     $tcuRes = $stmt->get_result();
     $topCustomers = [];
     while ($r = $tcuRes->fetch_assoc()) { $topCustomers[] = $r; }
     
-    // Format time labels (12-hour format)
+    // Get all-time data for discounts and top performers (not date-specific)
+    
+    // All-time total discounts
+    $allTimeDiscountsQuery = "SELECT 
+                                SUM(
+                                    -- Product-level discounts per order
+                                    (SELECT COALESCE(SUM(
+                                        CASE 
+                                            WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
+                                            WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
+                                            ELSE 0
+                                        END
+                                    ), 0)
+                                     FROM order_item oi
+                                     LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                     LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                                        AND d.is_active = 1
+                                        AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
+                                        AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
+                                     WHERE oi.order_id = o.id)
+                                    +
+                                    -- Promo discount per cart
+                                    COALESCE((SELECT 
+                                        CASE 
+                                            WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
+                                            WHEN pc.discount_type = 'fixed' THEN pc.discount_value
+                                            ELSE 0
+                                        END
+                                       FROM cart_promocodes cpc
+                                       LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
+                                       LEFT JOIN cart c ON c.id = cpc.cart_id
+                                       WHERE cpc.cart_id = o.cart_id
+                                       ORDER BY cpc.applied_at DESC
+                                       LIMIT 1), 0)
+                                ) as total_discounts
+                            FROM order_details o
+                            WHERE o.status IN ('completed','shipped','delivered')";
+    $stmt = $conn->prepare($allTimeDiscountsQuery);
+    $stmt->execute();
+    $allTimeDiscountsRow = $stmt->get_result()->fetch_assoc();
+    $allTimeDiscounts = $allTimeDiscountsRow['total_discounts'] ?? 0;
+    
+    // All-time top products
+    $allTimeTopProductsQuery = "SELECT p.name as label, SUM(oi.quantity) as value
+                               FROM order_item oi
+                               INNER JOIN order_details o ON o.id = oi.order_id
+                               INNER JOIN products p ON p.id = oi.product_id
+                               WHERE o.status IN ('completed','shipped','delivered')
+                               GROUP BY p.name
+                               ORDER BY value DESC
+                               LIMIT 5";
+    $stmt = $conn->prepare($allTimeTopProductsQuery);
+    $stmt->execute();
+    $allTimeTpRes = $stmt->get_result();
+    $allTimeTopProducts = [];
+    while ($r = $allTimeTpRes->fetch_assoc()) { $allTimeTopProducts[] = $r; }
+    
+    // All-time top categories
+    $allTimeTopCategoriesQuery = "SELECT sc.name as label, SUM(oi.quantity) as value
+                                 FROM order_item oi
+                                 INNER JOIN order_details o ON o.id = oi.order_id
+                                 INNER JOIN products p ON p.id = oi.product_id
+                                 INNER JOIN sub_categories sc ON sc.id = p.category_id
+                                 WHERE o.status IN ('completed','shipped','delivered')
+                                 GROUP BY sc.name
+                                 ORDER BY value DESC
+                                 LIMIT 5";
+    $stmt = $conn->prepare($allTimeTopCategoriesQuery);
+    $stmt->execute();
+    $allTimeTcRes = $stmt->get_result();
+    $allTimeTopCategories = [];
+    while ($r = $allTimeTcRes->fetch_assoc()) { $allTimeTopCategories[] = $r; }
+    
+    // All-time top customers
+    $allTimeTopCustomersQuery = "SELECT CONCAT(u.f_name, ' ', u.l_name) as label,
+                                        SUM(GREATEST((COALESCE(o.total,0) - COALESCE(o.tax_amount,0)) - (
+                                            (SELECT COALESCE(SUM(
+                                                CASE 
+                                                    WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
+                                                    WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
+                                                    ELSE 0
+                                                END
+                                            ), 0)
+                                             FROM order_item oi
+                                             LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                             LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                                                AND d.is_active = 1
+                                                AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
+                                                AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
+                                             WHERE oi.order_id = o.id)
+                                             +
+                                             COALESCE((SELECT 
+                                                 CASE 
+                                                     WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
+                                                     WHEN pc.discount_type = 'fixed' THEN pc.discount_value
+                                                     ELSE 0
+                                                 END
+                                                FROM cart_promocodes cpc
+                                                LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
+                                                LEFT JOIN cart c ON c.id = cpc.cart_id
+                                                WHERE cpc.cart_id = o.cart_id
+                                                ORDER BY cpc.applied_at DESC
+                                                LIMIT 1), 0)
+                                         ), 0)) as value
+                                FROM order_details o
+                                INNER JOIN users u ON u.id = o.user_id
+                                WHERE o.status IN ('completed','shipped','delivered')
+                                GROUP BY u.f_name, u.l_name
+                                ORDER BY value DESC
+                                LIMIT 5";
+    $stmt = $conn->prepare($allTimeTopCustomersQuery);
+    $stmt->execute();
+    $allTimeTcuRes = $stmt->get_result();
+    $allTimeTopCustomers = [];
+    while ($r = $allTimeTcuRes->fetch_assoc()) { $allTimeTopCustomers[] = $r; }
+    
+    // Generate time labels based on time period
     $timeLabels = [];
+    
+    if ($timePeriod === 'day') {
+        // 24-hour format for daily view
     for ($i = 0; $i < 24; $i++) {
         if ($i == 0) {
             $timeLabels[] = "12AM";
@@ -445,6 +675,27 @@ try {
             $timeLabels[] = $i . "AM";
         } else {
             $timeLabels[] = ($i - 12) . "PM";
+            }
+        }
+    } else {
+        // Generate labels based on actual data for weekly/monthly view
+        $allKeys = array_unique(array_merge(
+            array_keys($hourlyOrders),
+            array_keys($hourlySales),
+            array_keys($hourlyPayments)
+        ));
+        sort($allKeys);
+        
+        foreach ($allKeys as $key) {
+            if ($timePeriod === 'week') {
+                // Format as day names
+                $date = new DateTime($key);
+                $timeLabels[] = $date->format('D'); // Mon, Tue, Wed, etc.
+            } else if ($timePeriod === 'month') {
+                // Format as day of month
+                $date = new DateTime($key);
+                $timeLabels[] = $date->format('M j'); // Jan 1, Jan 2, etc.
+            }
         }
     }
     
@@ -455,10 +706,12 @@ try {
     error_log("Final hourly payments: " . json_encode($hourlyPayments));
     error_log("Time labels: " . json_encode($timeLabels));
     
-    // Verify specific hour mapping
-    for ($i = 0; $i < 24; $i++) {
-        if ($hourlyOrders[$i] > 0) {
-            error_log("Hour {$i} ({$timeLabels[$i]}) has {$hourlyOrders[$i]} orders");
+    // Verify specific hour mapping (only for daily view)
+    if ($timePeriod === 'day') {
+        for ($i = 0; $i < 24; $i++) {
+            if ($hourlyOrders[$i] > 0) {
+                error_log("Hour {$i} ({$timeLabels[$i]}) has {$hourlyOrders[$i]} orders");
+            }
         }
     }
     
@@ -467,6 +720,7 @@ try {
         'status' => 'success',
         'data' => [
             'date' => $currentDate,
+            'timePeriod' => $timePeriod,
             'timeLabels' => $timeLabels,
             'orders' => [
                 'hourly' => array_values($hourlyOrders),
@@ -482,12 +736,18 @@ try {
                 'total' => $totalPayments
             ],
             'discounts' => [
-                'total' => $totalDiscounts
+                'total' => $totalDiscounts,
+                'allTime' => $allTimeDiscounts
             ],
             'topPerformers' => [
                 'products' => $topProducts,
                 'categories' => $topCategories,
                 'customers' => $topCustomers
+            ],
+            'allTimeTopPerformers' => [
+                'products' => $allTimeTopProducts,
+                'categories' => $allTimeTopCategories,
+                'customers' => $allTimeTopCustomers
             ],
             'summary' => [
                 'totalOrders' => $totalOrders,

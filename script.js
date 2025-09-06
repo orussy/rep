@@ -1,11 +1,17 @@
 // Global variables for charts
 let ordersChart, salesChart, paymentsChart;
+let topProductsChart, topCategoriesChart, topCustomersChart;
 let currentSelectedDate = new Date().toISOString().split('T')[0]; // Current date in YYYY-MM-DD format
+let currentTimePeriod = 'day'; // Current time period (day, week, month)
 
 // Function to fetch dashboard data from API
-async function fetchDashboardData(date = null) {
+async function fetchDashboardData(date = null, period = null) {
     try {
-        const url = date ? `api/dashboard-data.php?date=${date}` : 'api/dashboard-data.php';
+        const params = new URLSearchParams();
+        if (date) params.append('date', date);
+        if (period) params.append('period', period);
+        
+        const url = `api/dashboard-data.php?${params.toString()}`;
         const response = await fetch(url);
         const result = await response.json();
         
@@ -15,6 +21,11 @@ async function fetchDashboardData(date = null) {
             if (date) {
                 document.getElementById('datePicker').value = date;
                 currentSelectedDate = date;
+            }
+            // Update the time period
+            if (period) {
+                document.getElementById('timePeriod').value = period;
+                currentTimePeriod = period;
             }
         } else {
             console.error('Failed to fetch data:', result.message);
@@ -28,18 +39,26 @@ async function fetchDashboardData(date = null) {
 
 // Function to update dashboard with real data
 function updateDashboard(data) {
-    // Update summary numbers
+    // Update summary numbers (daily data for orders, sales, payments)
     document.getElementById('ordersCount').textContent = 'Total Orders: ' + formatNumber(data.orders.total);
     document.getElementById('salesAmount').textContent = 'EGP ' + formatCurrencyNumber(data.sales.total);
     document.getElementById('paymentsAmount').textContent = 'EGP ' + formatCurrencyNumber(data.payments.total);
-    if (data.discounts && typeof data.discounts.total !== 'undefined') {
+    
+    // Use all-time data for discounts
+    if (data.discounts && typeof data.discounts.allTime !== 'undefined') {
         const el = document.getElementById('discountsAmount');
-        if (el) el.textContent = 'EGP ' + formatCurrencyNumber(data.discounts.total);
+        if (el) el.textContent = 'EGP ' + formatCurrencyNumber(data.discounts.allTime);
     }
     
-    // Update charts
+    // Update charts (daily data)
     updateCharts(data);
-    updateTopPerformers(data.topPerformers);
+    
+    // Use all-time data for top performers
+    if (data.allTimeTopPerformers) {
+        updateTopPerformers(data.allTimeTopPerformers);
+    } else {
+        updateTopPerformers(data.topPerformers);
+    }
     
     // Log the data for debugging
     console.log('Dashboard data updated for date:', data.date, data);
@@ -182,6 +201,12 @@ function createChart(ctx, data, label, color = "purple", timeLabels = null) {
 // Render pie charts for top performers
 function updateTopPerformers(topPerformers) {
     if (!topPerformers) return;
+    
+    // Destroy existing charts first
+    if (topProductsChart) topProductsChart.destroy();
+    if (topCategoriesChart) topCategoriesChart.destroy();
+    if (topCustomersChart) topCustomersChart.destroy();
+    
     const palettes = [
         '#4dc9f6', '#f67019', '#f53794', '#537bc4', '#acc236',
         '#166a8f', '#00a950', '#58595b', '#8549ba'
@@ -210,21 +235,21 @@ function updateTopPerformers(topPerformers) {
     const tpLabels = tp.map(x => x.label);
     const tpValues = tp.map(x => Number(x.value || 0));
     const tpCtx = document.getElementById('topProductsChart');
-    if (tpCtx) new Chart(tpCtx, cfg(tpLabels, tpValues, 'Top Products'));
+    if (tpCtx) topProductsChart = new Chart(tpCtx, cfg(tpLabels, tpValues, 'Top Products'));
 
     // Top categories
     const tc = topPerformers.categories || [];
     const tcLabels = tc.map(x => x.label);
     const tcValues = tc.map(x => Number(x.value || 0));
     const tcCtx = document.getElementById('topCategoriesChart');
-    if (tcCtx) new Chart(tcCtx, cfg(tcLabels, tcValues, 'Top Categories'));
+    if (tcCtx) topCategoriesChart = new Chart(tcCtx, cfg(tcLabels, tcValues, 'Top Categories'));
 
     // Top customers
     const tcu = topPerformers.customers || [];
     const tcuLabels = tcu.map(x => x.label);
     const tcuValues = tcu.map(x => Number(x.value || 0));
     const tcuCtx = document.getElementById('topCustomersChart');
-    if (tcuCtx) new Chart(tcuCtx, cfg(tcuLabels, tcuValues, 'Top Customers'));
+    if (tcuCtx) topCustomersChart = new Chart(tcuCtx, cfg(tcuLabels, tcuValues, 'Top Customers'));
 }
 
 // Function to handle database connection errors
@@ -249,16 +274,24 @@ function handleDatabaseError(error) {
 
 // Function to refresh dashboard data
 function refreshDashboard() {
-    console.log('Refreshing dashboard for date:', currentSelectedDate);
-    fetchDashboardData(currentSelectedDate);
+    console.log('Refreshing dashboard for date:', currentSelectedDate, 'period:', currentTimePeriod);
+    fetchDashboardData(currentSelectedDate, currentTimePeriod);
+}
+
+// Function to update charts with new time period
+function updateChartsPeriod() {
+    const selectedPeriod = document.getElementById('timePeriod').value;
+    console.log('Updating charts to period:', selectedPeriod);
+    fetchDashboardData(currentSelectedDate, selectedPeriod);
 }
 
 // Function to load data for a specific date
 function loadDateData() {
     const selectedDate = document.getElementById('datePicker').value;
+    const selectedPeriod = document.getElementById('timePeriod').value;
     if (selectedDate) {
-        console.log('Loading data for date:', selectedDate);
-        fetchDashboardData(selectedDate);
+        console.log('Loading data for date:', selectedDate, 'period:', selectedPeriod);
+        fetchDashboardData(selectedDate, selectedPeriod);
     } else {
         alert('Please select a date first');
     }
@@ -267,8 +300,9 @@ function loadDateData() {
 // Function to load today's data
 function loadTodayData() {
     const today = new Date().toISOString().split('T')[0];
-    console.log('Loading today\'s data:', today);
-    fetchDashboardData(today);
+    const selectedPeriod = document.getElementById('timePeriod').value;
+    console.log('Loading today\'s data:', today, 'period:', selectedPeriod);
+    fetchDashboardData(today, selectedPeriod);
 }
 
 // Function to toggle submenu
@@ -348,6 +382,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add date selection functionality
         document.getElementById('loadDateBtn').addEventListener('click', loadDateData);
         document.getElementById('todayBtn').addEventListener('click', loadTodayData);
+        
+        // Add time period selection functionality
+        document.getElementById('updateChartsBtn').addEventListener('click', updateChartsPeriod);
         
         console.log('Dashboard initialized successfully');
     } else {

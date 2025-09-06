@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Report - Store Management</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .inventory-container {
+            padding: 20px;
+            margin-top: 80px;
+        }
+        
+        .report-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        
+        .report-header {
+            background: linear-gradient(135deg, #0d3b5e, #1e5a8a);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .report-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0;
+        }
+        
+        .report-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        
+        .report-content {
+            padding: 20px;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .data-table tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .stock-low {
+            color: black;
+            
+        }
+        
+        .stock-medium {
+            color: black;
+            
+        }
+        
+        .stock-high {
+            color: black;
+            
+        }
+        
+        .movement-in {
+            color: black;
+            
+        }
+        
+        .movement-out {
+            color: black;
+        }
+        
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            transition: background-color 0.2s ease;
+        }
+        
+        .sortable-header:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .sortable-header:active {
+            background-color: #e9ecef;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+         .summary-card {
+             background: white;
+             padding: 20px;
+             border-radius: 10px;
+             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+             text-align: center;
+             cursor: pointer;
+             transition: all 0.3s ease;
+         }
+         
+         .summary-card:hover {
+             transform: translateY(-5px);
+             box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+         }
+        
+        .summary-card h3 {
+            color: #0d3b5e;
+            margin-bottom: 10px;
+        }
+        
+        .summary-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .filters {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .filter-group label {
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .filter-group select,
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+         @media (max-width: 768px) {
+             .inventory-container {
+                 margin-left: 0;
+                 padding: 10px;
+             }
+             
+             .data-table {
+                 font-size: 12px;
+             }
+             
+             .data-table th,
+             .data-table td {
+                 padding: 8px 4px;
+             }
+             
+             .filters {
+                 flex-direction: column;
+                 align-items: stretch;
+             }
+             
+             .quick-nav div {
+                 flex-direction: column;
+                 align-items: center;
+             }
+             
+             .quick-nav .btn {
+                 width: 100%;
+                 margin-bottom: 10px;
+             }
+         }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <div class="left"> <img src="img/store logo with one element on a white background.png" alt=""></div>
+        
+        <div class="right">
+            
+            <img src="img/bell-solid.svg" alt="Security">
+           
+            <img src="img/user-solid.svg" alt="Logout">
+        </div>
+    </div>
+    <div class="sidebar">
+        <ul>
+            <li><a href="dashboard.html">Dashboard</a></li>
+            <li><a href="order.html">Orders</a></li>
+            <li><a href="customers.html" class="active">Customers</a></li>
+             <li class="sidebar-item">
+                 <a href="#" class="reports-toggle" data-submenu="reports1">Reports <i class="arrow-icon">▼</i></a>
+                 <ul class="submenu" id="reports1">
+                     <li><a href="sales-report.html">Sales Report</a></li>
+                     <li><a href="inventory-report.html">Inventory Report</a></li>
+                     <li><a href="#">Business Report</a></li>
+                     <li><a href="#">Analytics Report</a></li>
+                 </ul>
+             </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports2">Inventory<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports2">
+                    <li><a href="#">Items</a></li>
+                    <li><a href="#">Categories</a></li>
+                    <li><a href="#">Sub Categories</a></li>
+                    <li><a href="#">Suppliers</a></li>
+                    <li><a href="#">Purchase Orders</a></li>
+                    <li><a href="#">Transfer Orders</a></li>
+                    <li><a href="#">Inventory Count</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="reports-toggle" data-submenu="reports3">Manage<i class="arrow-icon">▼</i></a>
+                <ul class="submenu" id="reports3">
+                    <li><a href="#">Users</a></li>
+                    <li><a href="#">Roles</a></li>
+                    <li><a href="#">More</a></li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+              <a href="#" class="reports-toggle" data-submenu="reports4">Marketing<i class="arrow-icon">▼</i></a>
+              <ul class="submenu" id="reports4">
+                <li><a href="#">Loyalty</a></li>
+                <li><a href="#">Discounts</a></li>
+                <li><a href="#">Promocodes</a></li>
+              </ul>
+          </li>
+        </ul>
+    </div>
+    <div class="content">
+        <!-- Report selection board -->
+        <div class="customers-container" id="reportBoard">
+            <div class="customers-header">
+                <h2 class="customers-title">Inventory Reports</h2>
+                <div class="customers-count">Choose a report</div>
+            </div>
+            <div class="dashboard" style="gap: 20px;">
+                <div class="card clickable-row" id="openStockOnHand" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-boxes"></i> Stock on Hand</h3>
+                    </div>
+                    <p class="date-time">Current stock levels by product and warehouse</p>
+                </div>
+                <div class="card clickable-row" id="openLowStock" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-exclamation-triangle"></i> Low Stock Report</h3>
+                    </div>
+                    <p class="date-time">Products that need restocking</p>
+                </div>
+                <div class="card clickable-row" id="openStockMovement" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-exchange-alt"></i> Stock Movement</h3>
+                    </div>
+                    <p class="date-time">Track inventory movements and transactions</p>
+                </div>
+                <div class="card clickable-row" id="openInventoryValuation" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3><i class="fas fa-calculator"></i> Inventory Valuation</h3>
+                    </div>
+                    <p class="date-time">Calculate total inventory value and costs</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock on Hand Report section -->
+        <div class="customers-container" id="stockOnHandSection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Stock on Hand Report</h2>
+                <div>
+                    <button id="backToBoard" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="stockCount">0 Products</span>
+                </div>
+            </div>
+
+            <div class="search-filter-section">
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="categoryFilter">Category:</label>
+                        <select id="categoryFilter" class="date-input">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                    <div class="date-input-group">
+                        <label for="warehouseFilter">Warehouse:</label>
+                        <select id="warehouseFilter" class="date-input">
+                            <option value="">All Warehouses</option>
+                        </select>
+                    </div>
+                    <div class="date-input-group">
+                        <label for="stockStatusFilter">Stock Status:</label>
+                        <select id="stockStatusFilter" class="date-input">
+                            <option value="">All</option>
+                            <option value="low">Low Stock</option>
+                            <option value="medium">Medium Stock</option>
+                            <option value="high">High Stock</option>
+                            <option value="out">Out of Stock</option>
+                        </select>
+                    </div>
+                    <button id="applyStockFilters" class="filter-btn">Apply</button>
+                    <button id="clearStockFilters" class="clear-btn">Clear</button>
+                    <button id="exportStockCsv" class="load-date-btn" style="margin-left:auto;">Export CSV</button>
+                </div>
+            </div>
+
+            <table class="customers-table" id="stockOnHandTable">
+                <thead>
+                    <tr>
+                        <th class="sortable-header" data-key="product_name">Product</th>
+                        <th class="sortable-header" data-key="sku">SKU</th>
+                        <th class="sortable-header" data-key="category_name">Category</th>
+                        <th class="sortable-header" data-key="current_stock">Current Stock</th>
+                        <th class="sortable-header" data-key="reserved_stock">Reserved</th>
+                        <th class="sortable-header" data-key="available_stock">Available Stock</th>
+                        <th class="sortable-header" data-key="warehouse">Warehouse</th>
+                        <th class="sortable-header" data-key="last_updated">Last Updated</th>
+                    </tr>
+                </thead>
+                <tbody id="stockOnHandBody">
+                    <tr><td colspan="8" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Low Stock Report section -->
+        <div class="customers-container" id="lowStockSection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Low Stock Report</h2>
+                <div>
+                    <button id="backToBoard2" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="lowStockCount">0 Items</span>
+                </div>
+            </div>
+
+            <div class="search-filter-section">
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="lowStockThreshold">Low Stock Threshold:</label>
+                        <input type="number" id="lowStockThreshold" class="date-input" value="10" min="1">
+                    </div>
+                    <button id="applyLowStockFilters" class="filter-btn">Apply</button>
+                    <button id="clearLowStockFilters" class="clear-btn">Clear</button>
+                    <button id="exportLowStockCsv" class="load-date-btn" style="margin-left:auto;">Export CSV</button>
+                </div>
+            </div>
+
+            <table class="customers-table" id="lowStockTable">
+                <thead>
+                    <tr>
+                        <th class="sortable-header" data-key="product_name">Product</th>
+                        <th class="sortable-header" data-key="sku">SKU</th>
+                        <th class="sortable-header" data-key="current_stock">Current Stock</th>
+                        <th class="sortable-header" data-key="suppliers">Suppliers</th>
+                        <th class="sortable-header" data-key="status">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="lowStockBody">
+                    <tr><td colspan="5" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Stock Movement Report section -->
+        <div class="customers-container" id="stockMovementSection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Stock Movement Report</h2>
+                <div>
+                    <button id="backToBoard3" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="movementCount">0 Movements</span>
+                </div>
+            </div>
+
+            <div class="search-filter-section">
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="movementDateFrom">From Date:</label>
+                        <input type="date" id="movementDateFrom" class="date-input">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="movementDateTo">To Date:</label>
+                        <input type="date" id="movementDateTo" class="date-input">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="movementTypeFilter">Movement Type:</label>
+                        <select id="movementTypeFilter" class="date-input">
+                            <option value="">All Types</option>
+                            <option value="IN">In</option>
+                            <option value="OUT">Out</option>
+                        </select>
+                    </div>
+                    <div class="date-input-group">
+                        <label for="movementProductFilter">Product:</label>
+                        <select id="movementProductFilter" class="date-input">
+                            <option value="">All Products</option>
+                        </select>
+                    </div>
+                    <button id="applyMovementFilters" class="filter-btn">Apply</button>
+                    <button id="clearMovementFilters" class="clear-btn">Clear</button>
+                    <button id="exportMovementCsv" class="load-date-btn" style="margin-left:auto;">Export CSV</button>
+                </div>
+            </div>
+
+            <table class="customers-table" id="stockMovementTable">
+                <thead>
+                    <tr>
+                        <th class="sortable-header" data-key="created_at">Date</th>
+                        <th class="sortable-header" data-key="product_name">Product</th>
+                        <th class="sortable-header" data-key="sku">SKU</th>
+                        <th class="sortable-header" data-key="movement_type">Movement Type</th>
+                        <th class="sortable-header" data-key="quantity">Quantity</th>
+                        <th class="sortable-header" data-key="balance_after">Balance After</th>
+                        <th class="sortable-header" data-key="reference">Reference</th>
+                    </tr>
+                </thead>
+                <tbody id="stockMovementBody">
+                    <tr><td colspan="7" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Inventory Valuation Report section -->
+        <div class="customers-container" id="inventoryValuationSection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Inventory Valuation Report</h2>
+                <div>
+                    <button id="backToBoard4" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="valuationCount">0 Products</span>
+                </div>
+            </div>
+
+            <div class="search-filter-section">
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="valuationCategoryFilter">Category:</label>
+                        <select id="valuationCategoryFilter" class="date-input">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                    <div class="date-input-group">
+                        <label for="valuationSortBy">Sort By:</label>
+                        <select id="valuationSortBy" class="date-input">
+                            <option value="value_desc">Value (High to Low)</option>
+                            <option value="value_asc">Value (Low to High)</option>
+                            <option value="quantity_desc">Quantity (High to Low)</option>
+                            <option value="quantity_asc">Quantity (Low to High)</option>
+                            <option value="product_name">Product Name</option>
+                        </select>
+                    </div>
+                    <button id="applyValuationFilters" class="filter-btn">Apply</button>
+                    <button id="clearValuationFilters" class="clear-btn">Clear</button>
+                    <button id="exportValuationCsv" class="load-date-btn" style="margin-left:auto;">Export CSV</button>
+                </div>
+            </div>
+
+            <table class="customers-table" id="inventoryValuationTable">
+                <thead>
+                    <tr>
+                        <th class="sortable-header" data-key="product_name">Product</th>
+                        <th class="sortable-header" data-key="sku">SKU</th>
+                        <th class="sortable-header" data-key="quantity">Quantity</th>
+                        <th class="sortable-header" data-key="cost_price">Cost Price</th>
+                        <th class="sortable-header" data-key="inventory_value">Inventory Value</th>
+                    </tr>
+                </thead>
+                <tbody id="inventoryValuationBody">
+                    <tr><td colspan="5" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Global variables
+        let stockOnHandData = [];
+        let lowStockData = [];
+        let stockMovementData = [];
+        let inventoryValuationData = [];
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default date range for movement report (last 30 days)
+            const today = new Date();
+            const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+            
+            document.getElementById('movementDateTo').value = today.toISOString().split('T')[0];
+            document.getElementById('movementDateFrom').value = thirtyDaysAgo.toISOString().split('T')[0];
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Set up sorting functionality
+            setupSorting();
+            
+            // Load filter data
+            populateFilters();
+        });
+
+        function setupEventListeners() {
+            // Report card clicks
+            document.getElementById('openStockOnHand').addEventListener('click', () => showReport('stockOnHandSection'));
+            document.getElementById('openLowStock').addEventListener('click', () => showReport('lowStockSection'));
+            document.getElementById('openStockMovement').addEventListener('click', () => showReport('stockMovementSection'));
+            document.getElementById('openInventoryValuation').addEventListener('click', () => showReport('inventoryValuationSection'));
+
+            // Back buttons
+            document.getElementById('backToBoard').addEventListener('click', () => showReport('reportBoard'));
+            document.getElementById('backToBoard2').addEventListener('click', () => showReport('reportBoard'));
+            document.getElementById('backToBoard3').addEventListener('click', () => showReport('reportBoard'));
+            document.getElementById('backToBoard4').addEventListener('click', () => showReport('reportBoard'));
+
+            // Filter buttons
+            document.getElementById('applyStockFilters').addEventListener('click', loadStockOnHand);
+            document.getElementById('clearStockFilters').addEventListener('click', clearStockFilters);
+            document.getElementById('applyLowStockFilters').addEventListener('click', loadLowStock);
+            document.getElementById('clearLowStockFilters').addEventListener('click', clearLowStockFilters);
+            document.getElementById('applyMovementFilters').addEventListener('click', loadStockMovement);
+            document.getElementById('clearMovementFilters').addEventListener('click', clearMovementFilters);
+            document.getElementById('applyValuationFilters').addEventListener('click', loadInventoryValuation);
+            document.getElementById('clearValuationFilters').addEventListener('click', clearValuationFilters);
+
+            // Export buttons
+            document.getElementById('exportStockCsv').addEventListener('click', () => exportToCsv('stockOnHand'));
+            document.getElementById('exportLowStockCsv').addEventListener('click', () => exportToCsv('lowStock'));
+            document.getElementById('exportMovementCsv').addEventListener('click', () => exportToCsv('stockMovement'));
+            document.getElementById('exportValuationCsv').addEventListener('click', () => exportToCsv('inventoryValuation'));
+        }
+
+        function showReport(reportId) {
+            // Hide all sections
+            document.getElementById('reportBoard').style.display = 'none';
+            document.getElementById('stockOnHandSection').style.display = 'none';
+            document.getElementById('lowStockSection').style.display = 'none';
+            document.getElementById('stockMovementSection').style.display = 'none';
+            document.getElementById('inventoryValuationSection').style.display = 'none';
+
+            // Show selected section
+            document.getElementById(reportId).style.display = 'block';
+
+            // Load data if it's a report section
+            if (reportId === 'stockOnHandSection') {
+                loadStockOnHand();
+            } else if (reportId === 'lowStockSection') {
+                loadLowStock();
+            } else if (reportId === 'stockMovementSection') {
+                loadStockMovement();
+            } else if (reportId === 'inventoryValuationSection') {
+                loadInventoryValuation();
+            }
+        }
+
+        // Stock on Hand Report
+        async function loadStockOnHand() {
+            const categoryId = document.getElementById('categoryFilter').value;
+            const warehouse = document.getElementById('warehouseFilter').value;
+            const stockStatus = document.getElementById('stockStatusFilter').value;
+
+            let url = 'api/stock-on-hand.php';
+            const params = new URLSearchParams();
+            if (categoryId) params.append('category_id', categoryId);
+            if (warehouse) params.append('warehouse', warehouse);
+            if (stockStatus) params.append('stock_status', stockStatus);
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    stockOnHandData = result.data;
+                    displayStockOnHand(stockOnHandData);
+                    document.getElementById('stockCount').textContent = `${stockOnHandData.length} Products`;
+                } else {
+                    document.getElementById('stockOnHandBody').innerHTML = 
+                        '<tr><td colspan="8" class="error">Error loading stock data: ' + result.message + '</td></tr>';
+                }
+            } catch (error) {
+                document.getElementById('stockOnHandBody').innerHTML = 
+                    '<tr><td colspan="8" class="error">Error loading stock data: ' + error.message + '</td></tr>';
+            }
+        }
+
+        function displayStockOnHand(data) {
+            if (data.length === 0) {
+                document.getElementById('stockOnHandBody').innerHTML = 
+                    '<tr><td colspan="8" class="no-data">No stock data available</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.forEach(item => {
+                const stockClass = getStockClass(item.available_stock, item.current_stock);
+                const reserved = item.reserved_stock || 0;
+                
+                html += `
+                    <tr>
+                        <td>${item.product_name}</td>
+                        <td>${item.sku}</td>
+                        <td>${item.category_name}</td>
+                        <td class="${stockClass}">${item.current_stock}</td>
+                        <td class="${reserved > 0 ? 'stock-medium' : ''}">${reserved}</td>
+                        <td class="${stockClass}">${item.available_stock}</td>
+                        <td>${item.warehouse || 'Main Warehouse'}</td>
+                        <td>${formatDate(item.last_updated)}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('stockOnHandBody').innerHTML = html;
+        }
+
+        function getStockClass(available, current) {
+            if (available === 0) return 'stock-low';
+            if (available <= 10) return 'stock-low';
+            if (available <= 50) return 'stock-medium';
+            return 'stock-high';
+        }
+
+        // Low Stock Report
+        async function loadLowStock() {
+            const threshold = document.getElementById('lowStockThreshold').value;
+            try {
+                const response = await fetch(`api/low-stock.php?threshold=${threshold}`);
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    lowStockData = result.data;
+                    displayLowStock(lowStockData);
+                    document.getElementById('lowStockCount').textContent = `${lowStockData.length} Items`;
+                } else {
+                    document.getElementById('lowStockBody').innerHTML = 
+                        '<tr><td colspan="5" class="error">Error loading low stock data: ' + result.message + '</td></tr>';
+                }
+            } catch (error) {
+                document.getElementById('lowStockBody').innerHTML = 
+                    '<tr><td colspan="5" class="error">Error loading low stock data: ' + error.message + '</td></tr>';
+            }
+        }
+
+        function displayLowStock(data) {
+            if (data.length === 0) {
+                document.getElementById('lowStockBody').innerHTML = 
+                    '<tr><td colspan="5" class="no-data">No low stock items found</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.forEach(item => {
+                const status = item.current_stock === 0 ? 'Out of Stock' : 'Low Stock';
+                const statusClass = item.current_stock === 0 ? 'stock-low' : 'stock-medium';
+                const suppliers = item.suppliers || 'No suppliers';
+                
+                html += `
+                    <tr>
+                        <td>${item.product_name}</td>
+                        <td>${item.sku}</td>
+                        <td class="${statusClass}">${item.current_stock}</td>
+                        <td>${suppliers}</td>
+                        <td class="${statusClass}">${status}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('lowStockBody').innerHTML = html;
+        }
+
+        // Stock Movement Report
+        async function loadStockMovement() {
+            const dateFrom = document.getElementById('movementDateFrom').value;
+            const dateTo = document.getElementById('movementDateTo').value;
+            const movementType = document.getElementById('movementTypeFilter').value;
+            const productId = document.getElementById('movementProductFilter').value;
+
+            let url = `api/stock-movement.php?date_from=${dateFrom}&date_to=${dateTo}`;
+            if (movementType) url += `&movement_type=${movementType}`;
+            if (productId) url += `&product_id=${productId}`;
+
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    stockMovementData = result.data;
+                    displayStockMovement(stockMovementData);
+                    document.getElementById('movementCount').textContent = `${stockMovementData.length} Movements`;
+                } else {
+                    document.getElementById('stockMovementBody').innerHTML = 
+                        '<tr><td colspan="7" class="error">Error loading movement data: ' + result.message + '</td></tr>';
+                }
+            } catch (error) {
+                document.getElementById('stockMovementBody').innerHTML = 
+                    '<tr><td colspan="7" class="error">Error loading movement data: ' + error.message + '</td></tr>';
+            }
+        }
+
+        function displayStockMovement(data) {
+            if (data.length === 0) {
+                document.getElementById('stockMovementBody').innerHTML = 
+                    '<tr><td colspan="7" class="no-data">No movement data found for the selected period</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.forEach(item => {
+                const movementClass = item.movement_type === 'IN' ? 'movement-in' : 'movement-out';
+                
+                html += `
+                    <tr>
+                        <td>${formatDate(item.created_at)}</td>
+                        <td>${item.product_name}</td>
+                        <td>${item.sku}</td>
+                        <td class="${movementClass}">${item.movement_type}</td>
+                        <td class="${movementClass}">${item.quantity}</td>
+                        <td>${item.balance_after}</td>
+                        <td>${item.reference} #${item.reference_id}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('stockMovementBody').innerHTML = html;
+        }
+
+        // Inventory Valuation Report
+        async function loadInventoryValuation() {
+            const categoryId = document.getElementById('valuationCategoryFilter').value;
+            const sortBy = document.getElementById('valuationSortBy').value;
+
+            let url = `api/inventory-valuation.php?sort_by=${sortBy}`;
+            if (categoryId) url += `&category_id=${categoryId}`;
+
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    inventoryValuationData = result.data;
+                    displayInventoryValuation(inventoryValuationData);
+                    document.getElementById('valuationCount').textContent = `${inventoryValuationData.length} Products`;
+                } else {
+                    document.getElementById('inventoryValuationBody').innerHTML = 
+                        '<tr><td colspan="5" class="error">Error loading valuation data: ' + result.message + '</td></tr>';
+                }
+            } catch (error) {
+                document.getElementById('inventoryValuationBody').innerHTML = 
+                    '<tr><td colspan="5" class="error">Error loading valuation data: ' + error.message + '</td></tr>';
+            }
+        }
+
+        function displayInventoryValuation(data) {
+            if (data.length === 0) {
+                document.getElementById('inventoryValuationBody').innerHTML = 
+                    '<tr><td colspan="5" class="no-data">No valuation data available</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.forEach(item => {
+                html += `
+                    <tr>
+                        <td>${item.product_name}</td>
+                        <td>${item.sku}</td>
+                        <td>${item.quantity}</td>
+                        <td>EGP ${formatCurrencyNumber(item.cost_price)}</td>
+                        <td class="stock-high">EGP ${formatCurrencyNumber(item.inventory_value)}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('inventoryValuationBody').innerHTML = html;
+        }
+
+        // Clear filter functions
+        function clearStockFilters() {
+            document.getElementById('categoryFilter').value = '';
+            document.getElementById('warehouseFilter').value = '';
+            document.getElementById('stockStatusFilter').value = '';
+            loadStockOnHand();
+        }
+
+        function clearLowStockFilters() {
+            document.getElementById('lowStockThreshold').value = '10';
+            loadLowStock();
+        }
+
+        function clearMovementFilters() {
+            const today = new Date();
+            const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+            document.getElementById('movementDateTo').value = today.toISOString().split('T')[0];
+            document.getElementById('movementDateFrom').value = thirtyDaysAgo.toISOString().split('T')[0];
+            document.getElementById('movementTypeFilter').value = '';
+            document.getElementById('movementProductFilter').value = '';
+            loadStockMovement();
+        }
+
+        function clearValuationFilters() {
+            document.getElementById('valuationCategoryFilter').value = '';
+            document.getElementById('valuationSortBy').value = 'value_desc';
+            loadInventoryValuation();
+        }
+
+        // Export functions
+        function exportToCsv(reportType) {
+            let data = [];
+            let filename = '';
+            
+            switch (reportType) {
+                case 'stockOnHand':
+                    data = stockOnHandData;
+                    filename = 'stock_on_hand_report.csv';
+                    break;
+                case 'lowStock':
+                    data = lowStockData;
+                    filename = 'low_stock_report.csv';
+                    break;
+                case 'stockMovement':
+                    data = stockMovementData;
+                    filename = 'stock_movement_report.csv';
+                    break;
+                case 'inventoryValuation':
+                    data = inventoryValuationData;
+                    filename = 'inventory_valuation_report.csv';
+                    break;
+            }
+            
+            if (data.length === 0) {
+                alert('No data to export');
+                return;
+            }
+            
+            // Convert data to CSV
+            const csv = convertToCSV(data);
+            downloadCSV(csv, filename);
+        }
+
+        function convertToCSV(data) {
+            if (data.length === 0) return '';
+            
+            const headers = Object.keys(data[0]);
+            const csvContent = [
+                headers.join(','),
+                ...data.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
+            ].join('\n');
+            
+            return csvContent;
+        }
+
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Populate filter dropdowns
+        async function populateFilters() {
+            try {
+                const response = await fetch('api/inventory-filters.php');
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // Populate category filters
+                    const categoryFilter = document.getElementById('categoryFilter');
+                    const valuationCategoryFilter = document.getElementById('valuationCategoryFilter');
+                    
+                    result.data.categories.forEach(category => {
+                        const option1 = new Option(category.name, category.id);
+                        const option2 = new Option(category.name, category.id);
+                        categoryFilter.add(option1);
+                        valuationCategoryFilter.add(option2);
+                    });
+
+                    // Populate product filter for movement report
+                    const movementProductFilter = document.getElementById('movementProductFilter');
+                    result.data.products.forEach(product => {
+                        const option = new Option(product.name, product.id);
+                        movementProductFilter.add(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading filter data:', error);
+            }
+        }
+
+        // Sorting functionality
+        let currentSort = { key: null, direction: 'asc' };
+
+        function setupSorting() {
+            // Add click event listeners to all sortable headers
+            document.querySelectorAll('.sortable-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const key = this.getAttribute('data-key');
+                    sortTable(key);
+                });
+                
+                // Add visual indicator
+                header.style.cursor = 'pointer';
+                header.style.userSelect = 'none';
+            });
+        }
+
+        function sortTable(key) {
+            // Determine sort direction
+            if (currentSort.key === key) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.direction = 'asc';
+            }
+            currentSort.key = key;
+
+            // Get current data based on which report is active
+            let data = [];
+            let tableId = '';
+            
+            if (document.getElementById('stockOnHandSection').style.display !== 'none') {
+                data = stockOnHandData;
+                tableId = 'stockOnHandTable';
+            } else if (document.getElementById('lowStockSection').style.display !== 'none') {
+                data = lowStockData;
+                tableId = 'lowStockTable';
+            } else if (document.getElementById('stockMovementSection').style.display !== 'none') {
+                data = stockMovementData;
+                tableId = 'stockMovementTable';
+            } else if (document.getElementById('inventoryValuationSection').style.display !== 'none') {
+                data = inventoryValuationData;
+                tableId = 'inventoryValuationTable';
+            }
+
+            if (data.length === 0) return;
+
+            // Sort the data
+            data.sort((a, b) => {
+                let aVal = a[key];
+                let bVal = b[key];
+
+                // Handle null/undefined values
+                if (aVal === null || aVal === undefined) aVal = '';
+                if (bVal === null || bVal === undefined) bVal = '';
+
+                // Handle different data types
+                if (key === 'current_stock' || key === 'reserved_stock' || key === 'available_stock' || 
+                    key === 'quantity' || key === 'cost_price' || key === 'inventory_value') {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                } else if (key === 'last_updated' || key === 'created_at') {
+                    aVal = new Date(aVal);
+                    bVal = new Date(bVal);
+                } else {
+                    aVal = String(aVal).toLowerCase();
+                    bVal = String(bVal).toLowerCase();
+                }
+
+                if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return currentSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Update the display
+            updateTableDisplay(data, tableId);
+            updateSortIndicators(key);
+        }
+
+        function updateTableDisplay(data, tableId) {
+            if (tableId === 'stockOnHandTable') {
+                displayStockOnHand(data);
+            } else if (tableId === 'lowStockTable') {
+                displayLowStock(data);
+            } else if (tableId === 'stockMovementTable') {
+                displayStockMovement(data);
+            } else if (tableId === 'inventoryValuationTable') {
+                displayInventoryValuation(data);
+            }
+        }
+
+        function updateSortIndicators(activeKey) {
+            // Remove all sort indicators
+            document.querySelectorAll('.sortable-header').forEach(header => {
+                header.innerHTML = header.innerHTML.replace(/ ↑| ↓/g, '');
+            });
+
+            // Add indicator to active header
+            const activeHeader = document.querySelector(`[data-key="${activeKey}"]`);
+            if (activeHeader) {
+                const indicator = currentSort.direction === 'asc' ? ' ↑' : ' ↓';
+                activeHeader.innerHTML += indicator;
+            }
+        }
+
+        // Utility functions
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+
+        function formatCurrencyNumber(number) {
+            return new Intl.NumberFormat('en-US').format(number);
+        }
+    </script>
+</body>
+</html>

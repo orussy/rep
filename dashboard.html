@@ -26,7 +26,7 @@
                 <a href="#" class="reports-toggle" data-submenu="reports1">Reports <i class="arrow-icon">▼</i></a>
                 <ul class="submenu" id="reports1">
                     <li><a href="sales-report.html">Sales Report</a></li>
-                    <li><a href="#">Inventory Report</a></li>
+                    <li><a href="inventory-report.html">Inventory Report</a></li>
                     <li><a href="#">Business Report</a></li>
                     <li><a href="#">Analytics Report</a></li>
                     
@@ -64,12 +64,26 @@
         </ul>
     </div>
     <div class="content">
-        <!-- Date Selector -->
-        <div class="date-selector">
-            <label for="datePicker">Select Date:</label>
-            <input type="date" id="datePicker" name="datePicker">
-            <button id="loadDateBtn" class="load-date-btn">Load Data</button>
-            <button id="todayBtn" class="today-btn">Today</button>
+        <!-- Selectors Container -->
+        <div class="selectors-container">
+            <!-- Date Selector -->
+            <div class="date-selector">
+                <label for="datePicker">Select Date:</label>
+                <input type="date" id="datePicker" name="datePicker">
+                <button id="loadDateBtn" class="load-date-btn">Load Data</button>
+                <button id="todayBtn" class="today-btn">Today</button>
+            </div>
+            
+            <!-- Time Period Selector -->
+            <div class="time-period-selector">
+                <label for="timePeriod">Chart Period:</label>
+                <select id="timePeriod" name="timePeriod">
+                    <option value="day">Daily (24 Hours)</option>
+                    <option value="week">Weekly (7 Days)</option>
+                    <option value="month">Monthly (30 Days)</option>
+                </select>
+                <button id="updateChartsBtn" class="update-charts-btn">Update Charts</button>
+            </div>
         </div>
         
         <div class="dashboard">
