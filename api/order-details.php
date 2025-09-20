@@ -168,6 +168,51 @@ try {
         $payment['amount'] = number_format($payment['amount'], 2);
     }
     
+    // Calculate order discount based on promocode
+    $orderDiscountAmount = 0.0;
+    $orderTotalAfterDiscount = (float)$order['total'];
+    
+    // Check if there's a promocode discount on this order
+    if (!empty($order['cart_id'])) {
+        $promoQuery = "SELECT pc.discount_type, pc.discount_value
+                       FROM cart_promocodes cpc
+                       JOIN promocodes pc ON pc.id = cpc.promocode_id
+                       WHERE cpc.cart_id = ?
+                       ORDER BY cpc.applied_at DESC
+                       LIMIT 1";
+        $promoStmt = $conn->prepare($promoQuery);
+        $promoStmt->bind_param("i", $order['cart_id']);
+        $promoStmt->execute();
+        $promoResult = $promoStmt->get_result();
+        
+        if ($promoResult->num_rows > 0) {
+            $promo = $promoResult->fetch_assoc();
+            $discountType = $promo['discount_type'];
+            $discountValue = (float)$promo['discount_value'];
+            
+            if ($discountType === 'fixed') {
+                // Fixed discount amount
+                $orderDiscountAmount = $discountValue;
+            } elseif ($discountType === 'percentage') {
+                // Percentage discount - apply on the total after product discounts
+                $totalAfterProductDiscounts = $itemsSubtotalRaw - $discountTotalRaw;
+                $orderDiscountAmount = $totalAfterProductDiscounts * ($discountValue / 100);
+            }
+
+            // Calculate total after discount: original total - product discounts - promo discount
+            $orderTotalAfterDiscount = $itemsSubtotalRaw - $discountTotalRaw - $orderDiscountAmount;
+        }
+    }
+    
+    // Add tax to the final amount (whether promo code exists or not)
+    $taxRate = isset($order['tax_rate']) ? (float)$order['tax_rate'] : 0.0;
+    $calculatedTaxAmount = 0.0;
+    if ($taxRate > 0) {
+        $subtotalBeforeTax = $orderTotalAfterDiscount;
+        $calculatedTaxAmount = $subtotalBeforeTax * ($taxRate / 100);
+        $orderTotalAfterDiscount = $subtotalBeforeTax + $calculatedTaxAmount;
+    }
+    
     // Add items, payment, and address to order data
     $order['items'] = $items;
     $order['payment'] = $payment;
@@ -179,10 +224,11 @@ try {
     
     // Format currency values
     $order['total'] = number_format($order['total'], 2);
-    $order['tax_amount'] = number_format($order['tax_amount'], 2);
+    $order['tax_amount'] = number_format($calculatedTaxAmount, 2);
 
     // Apply promo code discount if cart had a promocode
     $promoDiscountRaw = 0.0;
+    $promocodeInfo = null;
     if (!empty($order['cart_id'])) {
         // Get cart subtotal to base promo discount on
         $cartSubtotal = null;
@@ -203,7 +249,7 @@ try {
         }
 
         // Fetch any applied promo for this cart
-        $promoSql = "SELECT pc.discount_type, pc.discount_value
+        $promoSql = "SELECT pc.id, pc.code, pc.description, pc.discount_type, pc.discount_value, pc.min_cart_total, cpc.applied_at
                      FROM cart_promocodes cpc
                      LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
                      WHERE cpc.cart_id = ?
@@ -217,6 +263,18 @@ try {
                 $prow = $pr->fetch_assoc();
                 $pType = $prow['discount_type'];
                 $pValue = (float)$prow['discount_value'];
+                
+                // Store promocode information
+                $promocodeInfo = [
+                    'id' => $prow['id'],
+                    'code' => $prow['code'],
+                    'description' => $prow['description'],
+                    'discount_type' => $prow['discount_type'],
+                    'discount_value' => $prow['discount_value'],
+                    'min_cart_total' => $prow['min_cart_total'],
+                    'applied_at' => $prow['applied_at']
+                ];
+                
                 if ($pType === 'percentage') {
                     $promoDiscountRaw = round($cartSubtotal * ($pValue / 100.0), 2);
                 } elseif ($pType === 'fixed') {
@@ -228,8 +286,15 @@ try {
     }
 
     // Provide discount summary and derived totals
-    $order['discount_amount'] = number_format($discountTotalRaw + $promoDiscountRaw, 2);
+    $totalDiscountAmount = $discountTotalRaw + $orderDiscountAmount;
+    $subtotalAfterDiscounts = $itemsSubtotalRaw - $totalDiscountAmount;
+    $order['discount_amount'] = number_format($totalDiscountAmount, 2);
+    $order['total_after_discount'] = number_format($subtotalAfterDiscounts, 2);
+    $order['final_total'] = number_format($orderTotalAfterDiscount, 2);
     $order['items_subtotal'] = number_format($itemsSubtotalRaw, 2);
+    $order['product_discounts'] = number_format($discountTotalRaw, 2);
+    $order['promocode_discounts'] = number_format($orderDiscountAmount, 2);
+    $order['promocode_info'] = $promocodeInfo;
     
     echo json_encode([
         'status' => 'success',

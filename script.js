@@ -11,7 +11,7 @@ async function fetchDashboardData(date = null, period = null) {
         if (date) params.append('date', date);
         if (period) params.append('period', period);
         
-        const url = `api/dashboard-data.php?${params.toString()}`;
+        const url = `api/dashboard-data.php?${params.toString()}&t=${Date.now()}`;
         const response = await fetch(url);
         const result = await response.json();
         
@@ -44,7 +44,7 @@ function updateDashboard(data) {
     document.getElementById('salesAmount').textContent = 'EGP ' + formatCurrencyNumber(data.sales.total);
     document.getElementById('paymentsAmount').textContent = 'EGP ' + formatCurrencyNumber(data.payments.total);
     
-    // Use all-time data for discounts
+    // Always use all-time discount data to ensure it always appears
     if (data.discounts && typeof data.discounts.allTime !== 'undefined') {
         const el = document.getElementById('discountsAmount');
         if (el) el.textContent = 'EGP ' + formatCurrencyNumber(data.discounts.allTime);
@@ -358,13 +358,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (datePicker) {
         console.log('Dashboard initializing...');
         
-        // Set today's date as default in the date picker
-        const today = new Date().toISOString().split('T')[0];
-        datePicker.value = today;
-        currentSelectedDate = today;
+        // Set September 5, 2025 as default in the date picker (when orders were created)
+        const defaultDate = '2025-09-05';
+        datePicker.value = defaultDate;
+        currentSelectedDate = defaultDate;
         
-        // Fetch initial data for today
-        fetchDashboardData(today);
+        // Fetch initial data for the default date
+        fetchDashboardData(defaultDate);
         
         // Set up auto-refresh every 5 minutes
         setInterval(refreshDashboard, 5 * 60 * 1000);

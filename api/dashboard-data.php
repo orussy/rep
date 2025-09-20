@@ -138,49 +138,14 @@ try {
         error_log("Orders: Time period: {$timePeriodValue}, Count: {$count}, Timestamp: {$timestamp}, Date: {$orderDate}");
     }
     
-    // Fetch sales data for the specified time period
+    // Fetch sales data for the specified time period (using actual payment amounts)
     $salesQuery = "SELECT 
                         " . $dateGroupBy . " as time_period,
-                        SUM(
-                            GREATEST(
-                                (COALESCE(o.total,0) - COALESCE(o.tax_amount,0))
-                                - (
-                                    -- Product-level discounts per order
-                                    (SELECT COALESCE(SUM(
-                                        CASE 
-                                            WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
-                                            WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
-                                            ELSE 0
-                                        END
-                                    ), 0)
-                                     FROM order_item oi
-                                     LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
-                                     LEFT JOIN discounts d ON d.product_id = oi.product_id 
-                                        AND d.is_active = 1
-                                        AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
-                                        AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
-                                     WHERE oi.order_id = o.id)
-                                    +
-                                    -- Promo discount per cart
-                                    COALESCE((SELECT 
-                                        CASE 
-                                            WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
-                                            WHEN pc.discount_type = 'fixed' THEN pc.discount_value
-                                            ELSE 0
-                                        END
-                                       FROM cart_promocodes cpc
-                                       LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
-                                       LEFT JOIN cart c ON c.id = cpc.cart_id
-                                       WHERE cpc.cart_id = o.cart_id
-                                       ORDER BY cpc.applied_at DESC
-                                       LIMIT 1), 0)
-                                ),
-                                0
-                            )
-                        ) as total,
+                        SUM(COALESCE(p.amount, 0)) as total,
                         o.created_at as full_timestamp,
                         DATE(CONVERT_TZ(o.created_at, '+00:00', '+03:00')) as order_date
                     FROM order_details o
+                    LEFT JOIN payment_details p ON p.order_id = o.id AND p.status = 'completed'
                     WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')
                     GROUP BY " . $dateGroupBy . "
                     ORDER BY time_period";
@@ -302,42 +267,9 @@ try {
     $totalOrders = $stmt->get_result()->fetch_assoc()['total'];
     
     $totalSalesQuery = "SELECT 
-                            SUM(
-                                GREATEST(
-                                    (COALESCE(o.total,0) - COALESCE(o.tax_amount,0))
-                                    - (
-                                        (SELECT COALESCE(SUM(
-                                            CASE 
-                                                WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
-                                                WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
-                                                ELSE 0
-                                            END
-                                        ), 0)
-                                         FROM order_item oi
-                                         LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
-                                         LEFT JOIN discounts d ON d.product_id = oi.product_id 
-                                            AND d.is_active = 1
-                                            AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
-                                            AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
-                                         WHERE oi.order_id = o.id)
-                                        +
-                                        COALESCE((SELECT 
-                                            CASE 
-                                                WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
-                                                WHEN pc.discount_type = 'fixed' THEN pc.discount_value
-                                                ELSE 0
-                                            END
-                                           FROM cart_promocodes cpc
-                                           LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
-                                           LEFT JOIN cart c ON c.id = cpc.cart_id
-                                           WHERE cpc.cart_id = o.cart_id
-                                           ORDER BY cpc.applied_at DESC
-                                           LIMIT 1), 0)
-                                    ),
-                                    0
-                                )
-                            ) as total
+                            SUM(COALESCE(p.amount, 0)) as total
                         FROM order_details o
+                        LEFT JOIN payment_details p ON p.order_id = o.id AND p.status = 'completed'
                         WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')";
     $stmt = $conn->prepare($totalSalesQuery);
     if (is_array($dateParam)) {
@@ -364,40 +296,43 @@ try {
     $totalPaymentsResult = $stmt->get_result();
     $totalPayments = $totalPaymentsResult->fetch_assoc()['total'] ?? 0;
 
-    // Compute total discounts (product-level + promo) for completed/shipped/delivered orders on the date
+    // Compute actual discounts (promocode discounts + payment difference) for completed/shipped/delivered orders
     $totalDiscountsQuery = "SELECT 
                                 SUM(
-                                    -- Product-level discounts per order
-                                    (SELECT COALESCE(SUM(
-                                        CASE 
-                                            WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
-                                            WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
-                                            ELSE 0
-                                        END
-                                    ), 0)
-                                     FROM order_item oi
-                                     LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
-                                     LEFT JOIN discounts d ON d.product_id = oi.product_id 
-                                        AND d.is_active = 1
-                                        AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
-                                        AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
-                                     WHERE oi.order_id = o.id)
-                                    +
-                                    -- Promo discount per cart
-                                    COALESCE((SELECT 
-                                        CASE 
-                                            WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
-                                            WHEN pc.discount_type = 'fixed' THEN pc.discount_value
-                                            ELSE 0
-                                        END
-                                       FROM cart_promocodes cpc
-                                       LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
-                                       LEFT JOIN cart c ON c.id = cpc.cart_id
-                                       WHERE cpc.cart_id = o.cart_id
-                                       ORDER BY cpc.applied_at DESC
-                                       LIMIT 1), 0)
+                                    COALESCE(promocode_discounts.total_promocode_discounts, 0) +
+                                    CASE 
+                                        WHEN o.total > COALESCE(p.amount, 0) THEN o.total - COALESCE(p.amount, 0)
+                                        ELSE 0
+                                    END
                                 ) as total_discounts
                             FROM order_details o
+                            LEFT JOIN payment_details p ON p.order_id = o.id
+                            LEFT JOIN (
+                                SELECT 
+                                    o3.id as order_id,
+                                    SUM(
+                                        CASE 
+                                            WHEN pc.discount_type = 'percentage' AND cart_subtotal >= COALESCE(pc.min_cart_total, 0)
+                                                THEN (pc.discount_value / 100.0) * cart_subtotal
+                                            WHEN pc.discount_type = 'fixed' AND cart_subtotal >= COALESCE(pc.min_cart_total, 0)
+                                                THEN pc.discount_value
+                                            ELSE 0
+                                        END
+                                    ) as total_promocode_discounts
+                                FROM order_details o3
+                                LEFT JOIN cart_promocodes cpc ON cpc.cart_id = o3.cart_id
+                                LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
+                                    AND pc.is_active = 1
+                                    AND (pc.start_date IS NULL OR pc.start_date <= DATE(o3.created_at))
+                                    AND (pc.end_date IS NULL OR pc.end_date >= DATE(o3.created_at))
+                                LEFT JOIN (
+                                    SELECT order_id, SUM(ps.price * oi.quantity) AS cart_subtotal
+                                    FROM order_item oi
+                                    LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                    GROUP BY order_id
+                                ) cs ON cs.order_id = o3.id
+                                GROUP BY o3.id
+                            ) promocode_discounts ON promocode_discounts.order_id = o.id
                             WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')";
     $stmt = $conn->prepare($totalDiscountsQuery);
     if (is_array($dateParam)) {
@@ -408,6 +343,7 @@ try {
     $stmt->execute();
     $totalDiscountsRow = $stmt->get_result()->fetch_assoc();
     $totalDiscounts = $totalDiscountsRow['total_discounts'] ?? 0;
+    
     
     error_log("Total payments query executed for date: " . $currentDate);
     error_log("Total payments result: " . json_encode($totalPaymentsResult->fetch_assoc()));
@@ -497,39 +433,12 @@ try {
     $topCategories = [];
     while ($r = $tcRes->fetch_assoc()) { $topCategories[] = $r; }
 
-    // Customers (by net spend: total - tax - discounts)
+    // Customers (by actual payment amounts)
     $topCustomersQuery = "SELECT CONCAT(u.f_name, ' ', u.l_name) as label,
-                                 SUM(GREATEST((COALESCE(o.total,0) - COALESCE(o.tax_amount,0)) - (
-                                     (SELECT COALESCE(SUM(
-                                         CASE 
-                                             WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
-                                             WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
-                                             ELSE 0
-                                         END
-                                     ), 0)
-                                      FROM order_item oi
-                                      LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
-                                      LEFT JOIN discounts d ON d.product_id = oi.product_id 
-                                         AND d.is_active = 1
-                                         AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
-                                         AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
-                                      WHERE oi.order_id = o.id)
-                                      +
-                                      COALESCE((SELECT 
-                                          CASE 
-                                              WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
-                                              WHEN pc.discount_type = 'fixed' THEN pc.discount_value
-                                              ELSE 0
-                                          END
-                                         FROM cart_promocodes cpc
-                                         LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
-                                         LEFT JOIN cart c ON c.id = cpc.cart_id
-                                         WHERE cpc.cart_id = o.cart_id
-                                         ORDER BY cpc.applied_at DESC
-                                         LIMIT 1), 0)
-                                  ), 0)) as value
+                                 SUM(COALESCE(p.amount, 0)) as value
                           FROM order_details o
                           INNER JOIN users u ON u.id = o.user_id
+                          LEFT JOIN payment_details p ON p.order_id = o.id AND p.status = 'completed'
                           WHERE " . $dateFilter . " AND o.status IN ('completed','shipped','delivered')
                           GROUP BY u.f_name, u.l_name
                           ORDER BY value DESC
@@ -547,40 +456,43 @@ try {
     
     // Get all-time data for discounts and top performers (not date-specific)
     
-    // All-time total discounts
+    // All-time actual discounts (promocode discounts + payment difference)
     $allTimeDiscountsQuery = "SELECT 
                                 SUM(
-                                    -- Product-level discounts per order
-                                    (SELECT COALESCE(SUM(
-                                        CASE 
-                                            WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
-                                            WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
-                                            ELSE 0
-                                        END
-                                    ), 0)
-                                     FROM order_item oi
-                                     LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
-                                     LEFT JOIN discounts d ON d.product_id = oi.product_id 
-                                        AND d.is_active = 1
-                                        AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
-                                        AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
-                                     WHERE oi.order_id = o.id)
-                                    +
-                                    -- Promo discount per cart
-                                    COALESCE((SELECT 
-                                        CASE 
-                                            WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
-                                            WHEN pc.discount_type = 'fixed' THEN pc.discount_value
-                                            ELSE 0
-                                        END
-                                       FROM cart_promocodes cpc
-                                       LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
-                                       LEFT JOIN cart c ON c.id = cpc.cart_id
-                                       WHERE cpc.cart_id = o.cart_id
-                                       ORDER BY cpc.applied_at DESC
-                                       LIMIT 1), 0)
+                                    COALESCE(promocode_discounts.total_promocode_discounts, 0) +
+                                    CASE 
+                                        WHEN o.total > COALESCE(p.amount, 0) THEN o.total - COALESCE(p.amount, 0)
+                                        ELSE 0
+                                    END
                                 ) as total_discounts
                             FROM order_details o
+                            LEFT JOIN payment_details p ON p.order_id = o.id
+                            LEFT JOIN (
+                                SELECT 
+                                    o3.id as order_id,
+                                    SUM(
+                                        CASE 
+                                            WHEN pc.discount_type = 'percentage' AND cart_subtotal >= COALESCE(pc.min_cart_total, 0)
+                                                THEN (pc.discount_value / 100.0) * cart_subtotal
+                                            WHEN pc.discount_type = 'fixed' AND cart_subtotal >= COALESCE(pc.min_cart_total, 0)
+                                                THEN pc.discount_value
+                                            ELSE 0
+                                        END
+                                    ) as total_promocode_discounts
+                                FROM order_details o3
+                                LEFT JOIN cart_promocodes cpc ON cpc.cart_id = o3.cart_id
+                                LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
+                                    AND pc.is_active = 1
+                                    AND (pc.start_date IS NULL OR pc.start_date <= DATE(o3.created_at))
+                                    AND (pc.end_date IS NULL OR pc.end_date >= DATE(o3.created_at))
+                                LEFT JOIN (
+                                    SELECT order_id, SUM(ps.price * oi.quantity) AS cart_subtotal
+                                    FROM order_item oi
+                                    LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                    GROUP BY order_id
+                                ) cs ON cs.order_id = o3.id
+                                GROUP BY o3.id
+                            ) promocode_discounts ON promocode_discounts.order_id = o.id
                             WHERE o.status IN ('completed','shipped','delivered')";
     $stmt = $conn->prepare($allTimeDiscountsQuery);
     $stmt->execute();
@@ -618,39 +530,12 @@ try {
     $allTimeTopCategories = [];
     while ($r = $allTimeTcRes->fetch_assoc()) { $allTimeTopCategories[] = $r; }
     
-    // All-time top customers
+    // All-time top customers (by actual payment amounts)
     $allTimeTopCustomersQuery = "SELECT CONCAT(u.f_name, ' ', u.l_name) as label,
-                                        SUM(GREATEST((COALESCE(o.total,0) - COALESCE(o.tax_amount,0)) - (
-                                            (SELECT COALESCE(SUM(
-                                                CASE 
-                                                    WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value/100)
-                                                    WHEN d.discount_type = 'fixed' THEN (d.discount_value * oi.quantity)
-                                                    ELSE 0
-                                                END
-                                            ), 0)
-                                             FROM order_item oi
-                                             LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
-                                             LEFT JOIN discounts d ON d.product_id = oi.product_id 
-                                                AND d.is_active = 1
-                                                AND (d.start_date IS NULL OR d.start_date <= DATE(o.created_at))
-                                                AND (d.end_date IS NULL OR d.end_date >= DATE(o.created_at))
-                                             WHERE oi.order_id = o.id)
-                                             +
-                                             COALESCE((SELECT 
-                                                 CASE 
-                                                     WHEN pc.discount_type = 'percentage' THEN (COALESCE(c.total, 0) * pc.discount_value/100)
-                                                     WHEN pc.discount_type = 'fixed' THEN pc.discount_value
-                                                     ELSE 0
-                                                 END
-                                                FROM cart_promocodes cpc
-                                                LEFT JOIN promocodes pc ON pc.id = cpc.promocode_id
-                                                LEFT JOIN cart c ON c.id = cpc.cart_id
-                                                WHERE cpc.cart_id = o.cart_id
-                                                ORDER BY cpc.applied_at DESC
-                                                LIMIT 1), 0)
-                                         ), 0)) as value
+                                        SUM(COALESCE(p.amount, 0)) as value
                                 FROM order_details o
                                 INNER JOIN users u ON u.id = o.user_id
+                                LEFT JOIN payment_details p ON p.order_id = o.id AND p.status = 'completed'
                                 WHERE o.status IN ('completed','shipped','delivered')
                                 GROUP BY u.f_name, u.l_name
                                 ORDER BY value DESC

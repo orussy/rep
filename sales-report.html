@@ -54,6 +54,10 @@
         }
         /* Make promo table headers clearly clickable */
         #promoReportSection #promoTable thead th.sortable-header { cursor: pointer; user-select: none; }
+        /* Ensure Sales Summary cards show values despite global overrides */
+        #salesSummarySection .card .card-content { display: block !important; }
+        #salesSummarySection .big-number { font-size: 28px; font-weight: 700; color: #0d3b5e; margin-top: 6px; }
+        #salesSummarySection .card-subtext { font-size: 12px; color: #6b7280; margin-top: 6px; }
     </style>
 </head>
 <body>
@@ -116,6 +120,12 @@
                 <div class="customers-count">Choose a report</div>
             </div>
             <div class="dashboard" style="gap: 20px;">
+                <div class="card clickable-row" id="openSalesSummary" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3>Sales Summary</h3>
+                    </div>
+                    <p class="date-time">Gross, Discounts, Net (with/without Tax)</p>
+                </div>
                 <div class="card clickable-row" id="openProductSales" style="cursor:pointer;">
                     <div class="card-header">
                         <h3>Product Sales</h3>
@@ -140,7 +150,76 @@
                     </div>
                     <p class="date-time">Discount codes usage and effectiveness</p>
                 </div>
+                <div class="card clickable-row" id="openDiscountReport" style="cursor:pointer;">
+                    <div class="card-header">
+                        <h3>Discount Report</h3>
+                    </div>
+                    <p class="date-time">Product and promocode discount analysis</p>
+                </div>
                 
+            </div>
+        </div>
+
+        <!-- Sales Summary section -->
+        <div class="customers-container" id="salesSummarySection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Sales Summary</h2>
+                <div>
+                    <button id="backToBoard0" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="ordersMatched">0 Orders</span>
+                </div>
+            </div>
+            <div class="search-filter-section">
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="sumStartDate">Start Date</label>
+                        <input type="date" id="sumStartDate" class="date-input">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="sumEndDate">End Date</label>
+                        <input type="date" id="sumEndDate" class="date-input">
+                    </div>
+                    <button id="applySumFilters" class="filter-btn">Apply</button>
+                    <button id="clearSumFilters" class="clear-btn">Clear</button>
+                </div>
+            </div>
+            <div class="cards-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+                <div class="card small">
+                    <div class="card-header">
+                        <h3>Gross Sales</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="big-number" id="grossSales">EGP 0.00</div>
+                        <div class="card-subtext">Products before discount + Tax - Returns base - Returned Tax</div>
+                    </div>
+                </div>
+                <div class="card small">
+                    <div class="card-header">
+                        <h3>Discount Amount</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="big-number" id="discountAmount">EGP 0.00</div>
+                        <div class="card-subtext">Orders + Products - Returned portions</div>
+                    </div>
+                </div>
+                <div class="card small">
+                    <div class="card-header">
+                        <h3>Net Sales With Tax</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="big-number" id="netWithTax">EGP 0.00</div>
+                        <div class="card-subtext">Gross - Discount</div>
+                    </div>
+                </div>
+                <div class="card small">
+                    <div class="card-header">
+                        <h3>Net Sales</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="big-number" id="netSales">EGP 0.00</div>
+                        <div class="card-subtext">Gross - Discount - Tax</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -297,6 +376,101 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Discount Report section -->
+        <div class="customers-container" id="discountReportSection" style="display:none;">
+            <div class="customers-header">
+                <h2 class="customers-title">Discount Report</h2>
+                <div>
+                    <button id="backToBoard5" class="back-btn" style="margin-right:10px;">Back</button>
+                    <span class="customers-count" id="discountCount">0 Orders</span>
+                </div>
+            </div>
+            <div class="search-filter-section">
+                <div class="date-filter">
+                    <div class="date-input-group">
+                        <label for="discountStartDate">Start Date</label>
+                        <input type="date" id="discountStartDate" class="date-input">
+                    </div>
+                    <div class="date-input-group">
+                        <label for="discountEndDate">End Date</label>
+                        <input type="date" id="discountEndDate" class="date-input">
+                    </div>
+                    <button id="applyDiscountFilters" class="filter-btn">Apply</button>
+                    <button id="clearDiscountFilters" class="clear-btn">Clear</button>
+                    <button id="exportDiscountCsv" class="load-date-btn" style="margin-left:auto;">Export CSV</button>
+                </div>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div class="cards-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
+                <div class="card small">
+                    <div class="card-header">
+                        <h3>Orders with Discounts</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="big-number" id="ordersWithDiscounts">0</div>
+                        <div class="card-subtext">Total orders</div>
+                    </div>
+                </div>
+                <div class="card small">
+                    <div class="card-header">
+                        <h3>Product Discounts</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="big-number" id="totalProductDiscounts">EGP 0.00</div>
+                        <div class="card-subtext">Total amount</div>
+                    </div>
+                </div>
+                <div class="card small">
+                    <div class="card-header">
+                        <h3>Promocode Discounts</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="big-number" id="totalPromocodeDiscounts">EGP 0.00</div>
+                        <div class="card-subtext">Total amount</div>
+                    </div>
+                </div>
+                <div class="card small">
+                    <div class="card-header">
+                        <h3>Total Discounts</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="big-number" id="totalDiscountAmount">EGP 0.00</div>
+                        <div class="card-subtext">All discounts</div>
+                    </div>
+                </div>
+                <div class="card small">
+                    <div class="card-header">
+                        <h3>Avg Discount %</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="big-number" id="avgDiscountPercentage">0%</div>
+                        <div class="card-subtext">Average per order</div>
+                    </div>
+                </div>
+            </div>
+
+            <table class="customers-table" id="discountTable">
+                <thead>
+                    <tr>
+                        <th class="sortable-header" data-key="order_id">Order ID</th>
+                        <th class="sortable-header" data-key="order_date">Date</th>
+                        <th class="sortable-header" data-key="order_total">Order Total</th>
+                        <th class="sortable-header" data-key="total_product_discounts">Product Discounts</th>
+                        <th class="sortable-header" data-key="total_promocode_discounts">Promocode Discounts</th>
+                        <th class="sortable-header" data-key="actual_discount_amount">Actual Discount</th>
+                        <th class="sortable-header" data-key="total_discount_amount">Total Discount</th>
+                        <th class="sortable-header" data-key="discount_percentage">Discount %</th>
+                        <th class="sortable-header" data-key="products_with_discounts">Products</th>
+                        <th class="sortable-header" data-key="promocodes_used">Promocodes</th>
+                    </tr>
+                </thead>
+                <tbody id="discountTableBody">
+                    <tr><td colspan="10" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -312,9 +486,15 @@
         function showBoard() {
             board.style.display = '';
             productSection.style.display = 'none';
+            document.getElementById('salesSummarySection').style.display = 'none';
             regionSection.style.display = 'none';
             paymentSection.style.display = 'none';
             promoSection.style.display = 'none';
+            document.getElementById('discountReportSection').style.display = 'none';
+        }
+        function showSalesSummary() {
+            board.style.display = 'none';
+            document.getElementById('salesSummarySection').style.display = '';
         }
         function showProductSales() {
             board.style.display = 'none';
@@ -327,6 +507,42 @@
         function showPromoReport() {
             board.style.display = 'none';
             promoSection.style.display = '';
+        }
+        function showDiscountReport() {
+            board.style.display = 'none';
+            document.getElementById('discountReportSection').style.display = '';
+        }
+        function fetchSalesSummary() {
+            const start = document.getElementById('sumStartDate').value;
+            const end = document.getElementById('sumEndDate').value;
+            let url = 'api/sales-summary.php';
+            const params = [];
+            if (start) params.push('start_date=' + encodeURIComponent(start));
+            if (end) params.push('end_date=' + encodeURIComponent(end));
+            if (params.length) url += '?' + params.join('&');
+
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status !== 'success') throw new Error(res.message || 'Failed');
+                    const d = res.data || {};
+                    const fmt = v => 'EGP ' + (Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                    document.getElementById('grossSales').textContent = fmt(d.gross_sales);
+                    document.getElementById('discountAmount').textContent = fmt(d.discount_amount);
+                    document.getElementById('netWithTax').textContent = fmt(d.net_sales_with_tax);
+                    document.getElementById('netSales').textContent = fmt(d.net_sales);
+                    const oc = (typeof d.orders_count === 'number') ? d.orders_count : 0;
+                    const el = document.getElementById('ordersMatched');
+                    if (el) el.textContent = oc + ' Orders';
+                    console.log('Sales summary response:', res);
+                })
+                .catch(err => {
+                    console.error('Failed to load sales summary', err);
+                    ['grossSales','discountAmount','netWithTax','netSales'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = 'EGP 0.00';
+                    });
+                });
         }
         function fetchRegionSales() {
             const start = document.getElementById('regionStartDate').value;
@@ -649,6 +865,107 @@
         function renderPaymentSummaryRows(summary) { /* deprecated */ }
 
         let lastPromoData = [];
+        let lastDiscountData = [];
+        let discountSortState = { key: null, direction: 'asc' };
+
+        function fetchDiscountReport() {
+            const start = document.getElementById('discountStartDate').value;
+            const end = document.getElementById('discountEndDate').value;
+            let url = 'api/discount-report.php';
+            const params = [];
+            if (start) params.push('start_date=' + encodeURIComponent(start));
+            if (end) params.push('end_date=' + encodeURIComponent(end));
+            if (params.length) url += '?' + params.join('&');
+
+            const tbody = document.getElementById('discountTableBody');
+            tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status !== 'success') throw new Error(res.message || 'Failed');
+                    lastDiscountData = res.data || [];
+                    document.getElementById('discountCount').textContent = (res.count || 0) + ' Orders';
+                    
+                    // Update summary cards
+                    const summary = res.summary || {};
+                    document.getElementById('ordersWithDiscounts').textContent = summary.orders_with_discounts || 0;
+                    document.getElementById('totalProductDiscounts').textContent = 'EGP ' + (summary.total_product_discounts || '0.00');
+                    document.getElementById('totalPromocodeDiscounts').textContent = 'EGP ' + (summary.total_promocode_discounts || '0.00');
+                    document.getElementById('totalDiscountAmount').textContent = 'EGP ' + (summary.total_discount_amount || '0.00');
+                    document.getElementById('avgDiscountPercentage').textContent = (summary.avg_discount_percentage || '0') + '%';
+                    
+                    renderDiscountTable(lastDiscountData);
+                })
+                .catch(err => {
+                    tbody.innerHTML = '<tr><td colspan="10" class="error">Failed to load</td></tr>';
+                    console.error(err);
+                });
+        }
+
+        function renderDiscountTable(data) {
+            const tbody = document.getElementById('discountTableBody');
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="no-data">No discount data found</td></tr>';
+                return;
+            }
+            const rows = data.map(order => {
+                return `
+                    <tr>
+                        <td>${order.order_id}</td>
+                        <td>${order.order_date}</td>
+                        <td>EGP ${order.order_total}</td>
+                        <td>EGP ${order.total_product_discounts}</td>
+                        <td>EGP ${order.total_promocode_discounts}</td>
+                        <td>EGP ${order.actual_discount_amount}</td>
+                        <td>EGP ${order.total_discount_amount}</td>
+                        <td>${order.discount_percentage}%</td>
+                        <td>${order.products_with_discounts}</td>
+                        <td>${order.promocodes_used}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows.join('');
+        }
+
+        function exportDiscountCsv() {
+            if (!lastDiscountData || lastDiscountData.length === 0) {
+                alert('No data to export');
+                return;
+            }
+            const headers = ['Order ID','Date','Order Total','Product Discounts','Promocode Discounts','Actual Discount','Total Discount','Discount %','Products','Promocodes'];
+            const rows = lastDiscountData.map(order => [
+                order.order_id,
+                order.order_date,
+                order.order_total,
+                order.total_product_discounts,
+                order.total_promocode_discounts,
+                order.actual_discount_amount,
+                order.total_discount_amount,
+                order.discount_percentage + '%',
+                order.products_with_discounts,
+                order.promocodes_used
+            ]);
+            const lines = [headers.join(',')].concat(rows.map(row => row.map(v => {
+                if (v === null || v === undefined) return '';
+                const s = v.toString();
+                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            }).join(',')));
+            const csv = lines.join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', 'discount-report.csv');
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else if (navigator.msSaveOrOpenBlob) {
+                navigator.msSaveOrOpenBlob(blob, 'discount-report.csv');
+            }
+        }
+
         function fetchPromoReport() {
             const start = document.getElementById('promoStartDate').value;
             const end = document.getElementById('promoEndDate').value;
@@ -792,6 +1109,10 @@
             }
         }
 
+        document.getElementById('openSalesSummary').addEventListener('click', function(){
+            showSalesSummary();
+            fetchSalesSummary();
+        });
         document.getElementById('openProductSales').addEventListener('click', function(){
             showProductSales();
             fetchProductSales();
@@ -809,8 +1130,21 @@
             showPromoReport();
             fetchPromoReport();
         });
+        document.getElementById('openDiscountReport').addEventListener('click', function(){
+            showDiscountReport();
+            fetchDiscountReport();
+        });
+        document.getElementById('backToBoard0').addEventListener('click', function(){
+            showBoard();
+        });
         document.getElementById('backToBoard').addEventListener('click', function(){
             showBoard();
+        });
+        document.getElementById('applySumFilters').addEventListener('click', fetchSalesSummary);
+        document.getElementById('clearSumFilters').addEventListener('click', function(){
+            document.getElementById('sumStartDate').value = '';
+            document.getElementById('sumEndDate').value = '';
+            fetchSalesSummary();
         });
         document.getElementById('backToBoard2').addEventListener('click', function(){
             showBoard();
@@ -819,6 +1153,9 @@
             showBoard();
         });
         document.getElementById('backToBoard4').addEventListener('click', function(){
+            showBoard();
+        });
+        document.getElementById('backToBoard5').addEventListener('click', function(){
             showBoard();
         });
 
@@ -851,6 +1188,13 @@
             });
         });
         document.getElementById('exportPromoCsv').addEventListener('click', exportPromoCsv);
+        document.getElementById('applyDiscountFilters').addEventListener('click', fetchDiscountReport);
+        document.getElementById('clearDiscountFilters').addEventListener('click', function(){
+            document.getElementById('discountStartDate').value = '';
+            document.getElementById('discountEndDate').value = '';
+            fetchDiscountReport();
+        });
+        document.getElementById('exportDiscountCsv').addEventListener('click', exportDiscountCsv);
 
         // Set default dates for promo report
         const today = new Date();

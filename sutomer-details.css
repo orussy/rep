@@ -306,6 +306,69 @@
     line-height: 1.5;
 }
 
+.promocode-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+    border: 1px solid #e9ecef;
+}
+
+.promocode-section h3 {
+    margin: 0 0 16px 0;
+    color: #2c3e50;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.promocode-section h3::before {
+    content: "🎟️";
+    font-size: 20px;
+}
+
+.promocode-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+}
+
+.promocode-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.promocode-row:last-child {
+    border-bottom: none;
+}
+
+.promocode-row span:first-child {
+    font-size: 14px;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.promocode-row span:last-child {
+    font-size: 14px;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.promocode-code {
+    background: #667eea;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
 @media (max-width: 768px) {
     .customer-basic-info {
         grid-template-columns: 1fr;

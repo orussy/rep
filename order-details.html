@@ -356,38 +356,75 @@
                 `;
             }
             
-            // Calculate totals including discount
-            const subtotal = parseFloat(((order.items_subtotal || order.total) + '').replace(/,/g, ''));
-            const discountAmount = parseFloat(((order.discount_amount || 0) + '').replace(/,/g, ''));
-            const taxAmount = parseFloat(((order.tax_amount || 0) + '').replace(/,/g, ''));
-            const netSubtotal = Math.max(0, subtotal - discountAmount);
-            const finalTotal = netSubtotal + taxAmount;
+            // Add promocode information section if promocode was used
+            if (order.promocode_info) {
+                const promo = order.promocode_info;
+                html += `
+                    <div class="promocode-section">
+                        <h3>Promocode Information</h3>
+                        <div class="promocode-details">
+                            <div class="promocode-row">
+                                <span>Code:</span>
+                                <span class="promocode-code">${promo.code}</span>
+                            </div>
+                            <div class="promocode-row">
+                                <span>Description:</span>
+                                <span>${promo.description || 'No description'}</span>
+                            </div>
+                            <div class="promocode-row">
+                                <span>Discount Type:</span>
+                                <span>${promo.discount_type === 'percentage' ? 'Percentage' : 'Fixed Amount'}</span>
+                            </div>
+                            <div class="promocode-row">
+                                <span>Discount Value:</span>
+                                <span>${promo.discount_type === 'percentage' ? promo.discount_value + '%' : formatCurrency(promo.discount_value)}</span>
+                            </div>
+                            ${promo.min_cart_total ? `
+                            <div class="promocode-row">
+                                <span>Minimum Cart Total:</span>
+                                <span>${formatCurrency(promo.min_cart_total)}</span>
+                            </div>
+                            ` : ''}
+                            <div class="promocode-row">
+                                <span>Applied At:</span>
+                                <span>${new Date(promo.applied_at).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
             
-             // Add totals section
-             html += `
-                 <div class="total-section">
-                     <div class="total-row">
-                         <span>Subtotal:</span>
-                         <span>${formatCurrency((order.items_subtotal || order.total))}</span>
-                     </div>
-                     <div class="total-row">
-                         <span>Discount:</span>
-                         <span>-${formatCurrency((order.discount_amount || 0))}</span>
-                     </div>
-                     <div class="total-row">
-                         <span>Tax Rate:</span>
-                         <span>${order.tax_rate || 0}%</span>
-                     </div>
-                     <div class="total-row">
-                         <span>Tax Amount:</span>
-                         <span>${formatCurrency(order.tax_amount || 0)}</span>
-                     </div>
-                     <div class="total-row final">
-                         <span>Total:</span>
-                         <span>${formatCurrency(finalTotal.toFixed(2))}</span>
-                     </div>
-                 </div>
-             `;
+            // Add totals section with new discount logic
+            html += `
+                <div class="total-section">
+                    <div class="total-row">
+                        <span>Original Total:</span>
+                        <span>${formatCurrency(order.total)}</span>
+                    </div>
+                    ${order.discount_amount && parseFloat(order.discount_amount) > 0 ? `
+                    <div class="total-row">
+                        <span>Discount:</span>
+                        <span>-${formatCurrency(order.discount_amount)}</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Total After Discount:</span>
+                        <span>${formatCurrency(order.total_after_discount || order.total)}</span>
+                    </div>
+                    ` : ''}
+                    <div class="total-row">
+                        <span>Tax Rate:</span>
+                        <span>${order.tax_rate || 0}%</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Tax Amount:</span>
+                        <span>${formatCurrency(order.tax_amount || 0)}</span>
+                    </div>
+                    <div class="total-row final">
+                        <span>Final Total:</span>
+                        <span>${formatCurrency(order.final_total || order.total_after_discount || order.total)}</span>
+                    </div>
+                </div>
+            `;
             
             container.innerHTML = html;
 
