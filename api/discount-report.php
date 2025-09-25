@@ -107,7 +107,7 @@ actual_discounts AS (
     oir.total AS order_total,
     pd.amount AS payment_amount,
     CASE 
-      WHEN pd.amount IS NOT NULL AND oir.total > pd.amount
+      WHEN pd.amount IS NOT NULL AND oir.total > pd.amount AND pd.status = 'completed'
         THEN oir.total - pd.amount
       ELSE 0
     END AS actual_discount_amount
@@ -169,6 +169,8 @@ ORDER BY created_at DESC";
         'avg_discount_percentage' => 0,
         'orders_with_discounts' => 0
     ];
+    $sumAllDiscounts = 0.0;       // product + promocode + actual (per requirement: All discounts)
+    $sumOrderTotals = 0.0;        // sum of order totals to compute avg % accurately
 
     while ($row = $result->fetch_assoc()) {
         $rows[] = [
@@ -186,23 +188,35 @@ ORDER BY created_at DESC";
 
         // Update summary
         $summary['total_orders']++;
-        $summary['total_product_discounts'] += (float)$row['total_product_discounts'];
-        $summary['total_promocode_discounts'] += (float)$row['total_promocode_discounts'];
-        $summary['total_actual_discounts'] += (float)$row['actual_discount_amount'];
-        $summary['total_discount_amount'] += (float)$row['total_discount_amount'];
-        $summary['orders_with_discounts']++;
+        $productDisc = (float)$row['total_product_discounts'];
+        $promoDisc   = (float)$row['total_promocode_discounts'];
+        $actualDisc  = (float)$row['actual_discount_amount'];
+        $orderTotal  = (float)$row['order_total'];
+
+        $summary['total_product_discounts'] += $productDisc;
+        $summary['total_promocode_discounts'] += $promoDisc;
+        $summary['total_actual_discounts'] += $actualDisc;
+        
+        // For "All discounts" card, include product + promocode + actual
+        $thisOrderAllDiscounts = $productDisc + $promoDisc + $actualDisc;
+        $sumAllDiscounts += $thisOrderAllDiscounts;
+        $sumOrderTotals += $orderTotal;
+        if ($thisOrderAllDiscounts > 0) {
+            $summary['orders_with_discounts']++;
+        }
     }
 
     // Calculate average discount percentage
-    if ($summary['orders_with_discounts'] > 0) {
-        $summary['avg_discount_percentage'] = number_format($summary['total_discount_amount'] / $summary['total_orders'], 2, '.', '');
+    if ($sumOrderTotals > 0) {
+        $summary['avg_discount_percentage'] = number_format(($sumAllDiscounts / $sumOrderTotals) * 100.0, 2, '.', '');
     }
 
     // Format summary amounts
     $summary['total_product_discounts'] = number_format($summary['total_product_discounts'], 2, '.', '');
     $summary['total_promocode_discounts'] = number_format($summary['total_promocode_discounts'], 2, '.', '');
     $summary['total_actual_discounts'] = number_format($summary['total_actual_discounts'], 2, '.', '');
-    $summary['total_discount_amount'] = number_format($summary['total_discount_amount'], 2, '.', '');
+    // Replace previous total with the correct "All discounts" aggregation
+    $summary['total_discount_amount'] = number_format($sumAllDiscounts, 2, '.', '');
 
     echo json_encode([
         'status' => 'success',

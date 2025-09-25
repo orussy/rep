@@ -5,6 +5,7 @@ header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once '../config/db.php';
+require_once 'tax-calculator.php';
 
 try {
     // Get order ID from query parameter
@@ -204,14 +205,17 @@ try {
         }
     }
     
-    // Add tax to the final amount (whether promo code exists or not)
+    // Calculate tax after discount using the TaxCalculator
     $taxRate = isset($order['tax_rate']) ? (float)$order['tax_rate'] : 0.0;
-    $calculatedTaxAmount = 0.0;
-    if ($taxRate > 0) {
-        $subtotalBeforeTax = $orderTotalAfterDiscount;
-        $calculatedTaxAmount = $subtotalBeforeTax * ($taxRate / 100);
-        $orderTotalAfterDiscount = $subtotalBeforeTax + $calculatedTaxAmount;
-    }
+    $taxCalculation = TaxCalculator::calculateOrderTax(
+        $itemsSubtotalRaw,
+        $discountTotalRaw,
+        $orderDiscountAmount,
+        $taxRate
+    );
+    
+    $calculatedTaxAmount = $taxCalculation['tax_amount'];
+    $orderTotalAfterDiscount = $taxCalculation['final_total'];
     
     // Add items, payment, and address to order data
     $order['items'] = $items;
@@ -285,15 +289,14 @@ try {
         $ps->close();
     }
 
-    // Provide discount summary and derived totals
-    $totalDiscountAmount = $discountTotalRaw + $orderDiscountAmount;
-    $subtotalAfterDiscounts = $itemsSubtotalRaw - $totalDiscountAmount;
-    $order['discount_amount'] = number_format($totalDiscountAmount, 2);
-    $order['total_after_discount'] = number_format($subtotalAfterDiscounts, 2);
-    $order['final_total'] = number_format($orderTotalAfterDiscount, 2);
-    $order['items_subtotal'] = number_format($itemsSubtotalRaw, 2);
-    $order['product_discounts'] = number_format($discountTotalRaw, 2);
-    $order['promocode_discounts'] = number_format($orderDiscountAmount, 2);
+    // Provide discount summary and derived totals using tax calculation
+    $order['discount_amount'] = number_format($taxCalculation['total_discounts'], 2);
+    $order['total_after_discount'] = number_format($taxCalculation['subtotal_after_discount'], 2);
+    $order['final_total'] = number_format($taxCalculation['final_total'], 2);
+    $order['items_subtotal'] = number_format($taxCalculation['items_subtotal'], 2);
+    $order['product_discounts'] = number_format($taxCalculation['product_discounts'], 2);
+    $order['promocode_discounts'] = number_format($taxCalculation['promocode_discounts'], 2);
+    $order['tax_calculation'] = TaxCalculator::formatCurrency($taxCalculation);
     $order['promocode_info'] = $promocodeInfo;
     
     echo json_encode([

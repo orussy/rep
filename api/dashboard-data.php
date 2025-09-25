@@ -296,18 +296,36 @@ try {
     $totalPaymentsResult = $stmt->get_result();
     $totalPayments = $totalPaymentsResult->fetch_assoc()['total'] ?? 0;
 
-    // Compute actual discounts (promocode discounts + payment difference) for completed/shipped/delivered orders
+    // Compute actual discounts (product discounts + promocode discounts) for completed/shipped/delivered orders
     $totalDiscountsQuery = "SELECT 
                                 SUM(
-                                    COALESCE(promocode_discounts.total_promocode_discounts, 0) +
-                                    CASE 
-                                        WHEN o.total > COALESCE(p.amount, 0) THEN o.total - COALESCE(p.amount, 0)
-                                        ELSE 0
-                                    END
+                                    COALESCE(product_discounts.total_product_discounts, 0) +
+                                    COALESCE(promocode_discounts.total_promocode_discounts, 0)
                                 ) as total_discounts
                             FROM order_details o
-                            LEFT JOIN payment_details p ON p.order_id = o.id
+                            INNER JOIN payment_details p ON p.order_id = o.id AND p.status = 'completed'
                             LEFT JOIN (
+                                -- Product discounts
+                                SELECT 
+                                    oi.order_id,
+                                    SUM(
+                                        CASE 
+                                            WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value / 100.0)
+                                            WHEN d.discount_type = 'fixed' THEN d.discount_value * oi.quantity
+                                            ELSE 0
+                                        END
+                                    ) as total_product_discounts
+                                FROM order_item oi
+                                LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                LEFT JOIN order_details od ON od.id = oi.order_id
+                                LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                                    AND d.is_active = 1
+                                    AND (d.start_date IS NULL OR d.start_date <= DATE(od.created_at))
+                                    AND (d.end_date IS NULL OR d.end_date >= DATE(od.created_at))
+                                GROUP BY oi.order_id
+                            ) product_discounts ON product_discounts.order_id = o.id
+                            LEFT JOIN (
+                                -- Promocode discounts
                                 SELECT 
                                     o3.id as order_id,
                                     SUM(
@@ -456,18 +474,36 @@ try {
     
     // Get all-time data for discounts and top performers (not date-specific)
     
-    // All-time actual discounts (promocode discounts + payment difference)
+    // All-time actual discounts (product discounts + promocode discounts)
     $allTimeDiscountsQuery = "SELECT 
                                 SUM(
-                                    COALESCE(promocode_discounts.total_promocode_discounts, 0) +
-                                    CASE 
-                                        WHEN o.total > COALESCE(p.amount, 0) THEN o.total - COALESCE(p.amount, 0)
-                                        ELSE 0
-                                    END
+                                    COALESCE(product_discounts.total_product_discounts, 0) +
+                                    COALESCE(promocode_discounts.total_promocode_discounts, 0)
                                 ) as total_discounts
                             FROM order_details o
-                            LEFT JOIN payment_details p ON p.order_id = o.id
+                            INNER JOIN payment_details p ON p.order_id = o.id AND p.status = 'completed'
                             LEFT JOIN (
+                                -- Product discounts
+                                SELECT 
+                                    oi.order_id,
+                                    SUM(
+                                        CASE 
+                                            WHEN d.discount_type = 'percentage' THEN (ps.price * oi.quantity) * (d.discount_value / 100.0)
+                                            WHEN d.discount_type = 'fixed' THEN d.discount_value * oi.quantity
+                                            ELSE 0
+                                        END
+                                    ) as total_product_discounts
+                                FROM order_item oi
+                                LEFT JOIN product_skus ps ON oi.product_sku_id = ps.id
+                                LEFT JOIN order_details od ON od.id = oi.order_id
+                                LEFT JOIN discounts d ON d.product_id = oi.product_id 
+                                    AND d.is_active = 1
+                                    AND (d.start_date IS NULL OR d.start_date <= DATE(od.created_at))
+                                    AND (d.end_date IS NULL OR d.end_date >= DATE(od.created_at))
+                                GROUP BY oi.order_id
+                            ) product_discounts ON product_discounts.order_id = o.id
+                            LEFT JOIN (
+                                -- Promocode discounts
                                 SELECT 
                                     o3.id as order_id,
                                     SUM(

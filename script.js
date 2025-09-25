@@ -99,6 +99,11 @@ function formatCurrencyNumber(num) {
 
 // Function to create chart
 function createChart(ctx, data, label, color = "purple", timeLabels = null) {
+    // If Chart.js is not available (e.g., offline CDN), skip gracefully
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded. Skipping chart for:', label);
+        return null;
+    }
     // Use time labels from API if provided, otherwise generate default ones
     if (!timeLabels) {
         timeLabels = [];
@@ -201,6 +206,10 @@ function createChart(ctx, data, label, color = "purple", timeLabels = null) {
 // Render pie charts for top performers
 function updateTopPerformers(topPerformers) {
     if (!topPerformers) return;
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded. Skipping top performers charts.');
+        return;
+    }
     
     // Destroy existing charts first
     if (topProductsChart) topProductsChart.destroy();
@@ -235,21 +244,21 @@ function updateTopPerformers(topPerformers) {
     const tpLabels = tp.map(x => x.label);
     const tpValues = tp.map(x => Number(x.value || 0));
     const tpCtx = document.getElementById('topProductsChart');
-    if (tpCtx) topProductsChart = new Chart(tpCtx, cfg(tpLabels, tpValues, 'Top Products'));
+    if (tpCtx) topProductsChart = (typeof Chart !== 'undefined') ? new Chart(tpCtx, cfg(tpLabels, tpValues, 'Top Products')) : null;
 
     // Top categories
     const tc = topPerformers.categories || [];
     const tcLabels = tc.map(x => x.label);
     const tcValues = tc.map(x => Number(x.value || 0));
     const tcCtx = document.getElementById('topCategoriesChart');
-    if (tcCtx) topCategoriesChart = new Chart(tcCtx, cfg(tcLabels, tcValues, 'Top Categories'));
+    if (tcCtx) topCategoriesChart = (typeof Chart !== 'undefined') ? new Chart(tcCtx, cfg(tcLabels, tcValues, 'Top Categories')) : null;
 
     // Top customers
     const tcu = topPerformers.customers || [];
     const tcuLabels = tcu.map(x => x.label);
     const tcuValues = tcu.map(x => Number(x.value || 0));
     const tcuCtx = document.getElementById('topCustomersChart');
-    if (tcuCtx) topCustomersChart = new Chart(tcuCtx, cfg(tcuLabels, tcuValues, 'Top Customers'));
+    if (tcuCtx) topCustomersChart = (typeof Chart !== 'undefined') ? new Chart(tcuCtx, cfg(tcuLabels, tcuValues, 'Top Customers')) : null;
 }
 
 // Function to handle database connection errors
@@ -358,12 +367,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (datePicker) {
         console.log('Dashboard initializing...');
         
-        // Set September 5, 2025 as default in the date picker (when orders were created)
-        const defaultDate = '2025-09-05';
+        // Set today's date as default in the date picker
+        const today = new Date();
+        const defaultDate = today.toISOString().split('T')[0]; // Format: YYYY-MM-DD
         datePicker.value = defaultDate;
         currentSelectedDate = defaultDate;
         
-        // Fetch initial data for the default date
+        // Fetch initial data for today's date
         fetchDashboardData(defaultDate);
         
         // Set up auto-refresh every 5 minutes
